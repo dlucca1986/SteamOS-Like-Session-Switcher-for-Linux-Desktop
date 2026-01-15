@@ -24,7 +24,7 @@ If you love the Steam Deck gaming experience as much as I do, you’re in the ri
   I’ve included a handy desktop shortcut! You’ll find a **"Return to Gaming Mode"** icon right on your KDE desktop, so you can jump back into your library with just one click.
 
 * **📦 Optimized for Arch-based Distros**
-  Specifically tuned for the Arch ecosystem (Arch, Manjaro, EndeavourOS, Bazzite) to ensure maximum compatibility and performance.
+  Specifically tuned for the Arch ecosystem to ensure maximum compatibility and performance.
 
 ---
 
