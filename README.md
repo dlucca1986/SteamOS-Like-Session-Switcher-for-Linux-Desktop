@@ -28,9 +28,32 @@ If you love the Steam Deck gaming experience as much as I do, you’re in the ri
 
 ---
 
-## 🚀 Quick Installation
+🛠️ Quick Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/tuo-username/steamos-switcher.git](https://github.com/tuo-username/steamos-switcher.git)
-   cd steamos-switcher
+Metti qui solo i comandi essenziali. Un utente vuole sapere subito come si installa.
+Bash
+
+git clone https://github.com/tuo-username/steamos-switcher.git
+cd steamos-switcher
+chmod +x install.sh
+sudo ./install.sh
+
+📖 Documentation & Wiki
+
+Qui è dove sposti tutto il "peso" tecnico. Questo mantiene il README leggero.
+
+For detailed information, please visit our Project Wiki. You will find:
+
+    Sudoers Setup: How to enable passwordless switching (essential!).
+
+    Architecture: How the Master/Helper system works.
+
+    Troubleshooting: Solutions for common display or session issues.
+
+🤝 Contributing & Support
+
+Questo chiude con il tono amichevole che abbiamo scelto.
+
+If you have any suggestions, feel free to open an Issue or a Pull Request. Being a gaming fanatic means I’m always looking for ways to improve this experience!
+
+If this project made your gaming life easier, don't forget to leave a ⭐!
