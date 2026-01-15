@@ -75,7 +75,7 @@ Built with ❤️ by a gaming fan for the Linux Community.
 Before installing, make sure you have the core components installed. On Arch Linux, you can install them with:
 
 ```bash
-sudo pacman -S steam gamescope
+sudo pacman -S steam gamescope mangohud lib32-mangohud
 ```
 
 
