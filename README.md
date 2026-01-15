@@ -70,9 +70,19 @@ Built with ❤️ by a gaming fan for the Linux Community.
 ---
 
 
+## 🛠️ Prerequisites:
+
+Before installing, make sure you have the core components installed. On Arch Linux, you can install them with:
+
+```bash
+sudo pacman -S steam gamescope
+```
+
+
+---
+
 
 ## 🚀 Quick Installation
-
 
 To get started, copy and paste these commands into your terminal:
 
