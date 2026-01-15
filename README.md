@@ -3,13 +3,13 @@ This project provides a set of scripts to replicate the seamless session switchi
 
 What's inside ?
 
-. set-sddm-session: 
+set-sddm-session: 
   The core logic. It writes a temporary configuration to /etc/sddm.conf.d/ to set the autologin session for the next boot and triggers a delayed restart of the Display     Manager.
 
-. gamescope-session: 
+gamescope-session: 
   The Game Mode launcher. It starts Steam with -steamdeck parameters inside a Gamescope standalone session.
 
-. steamos-session-select:
+steamos-session-select:
   A quick wrapper to call the system session selector and return to Plasma.
 
 Prerequisites :
