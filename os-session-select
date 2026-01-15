@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Auto-detect current user if not hardcoded
+SESSION_NAME=$1
+USER_NAME=$(whoami)
+
+if [[ "$SESSION_NAME" == "plasma" ]]; then
+    # Standard target for KDE Plasma session
+    SESSION_FILE="plasma"
+    
+    # Properly shutdown Steam before switching to avoid cloud sync issues
+    echo "Shutting down Steam..."
+    steam -shutdown &> /dev/null || true
+    sleep 2
+    
+    # Apply the autologin session via the helper script
+    sudo /usr/local/bin/set-sddm-session "$SESSION_FILE" "$USER_NAME"
+
+elif [[ "$SESSION_NAME" == "gamescope-session-steam" ]]; then
+    # Target for Steam Deck UI / Gamescope session
+    SESSION_FILE="gamescope-session"
+    
+    echo "Preparing Gaming Mode for $USER_NAME..."
+    sudo /usr/local/bin/set-sddm-session "$SESSION_FILE" "$USER_NAME"
+
+else
+    echo "Usage: $0 [plasma|gamescope-session-steam]"
+    exit 1
+fi
+
+# Terminate current user session to trigger SDDM restart with new settings
+echo "Switching session now..."
+loginctl terminate-user "$USER_NAME"
