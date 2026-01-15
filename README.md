@@ -28,32 +28,12 @@ If you love the Steam Deck gaming experience as much as I do, you’re in the ri
 
 ---
 
-🛠️ Quick Installation
+## 🚀 Quick Installation
 
-Metti qui solo i comandi essenziali. Un utente vuole sapere subito come si installa.
-Bash
+To get started, simply copy and paste these commands into your terminal:
 
-git clone https://github.com/tuo-username/steamos-switcher.git
-cd steamos-switcher
+```bash
+git clone [https://github.com/dlucca1986/SteamOS-Like-Session-Switcher-for-Linux-Desktop.git](https://github.com/dlucca1986/SteamOS-Like-Session-Switcher-for-Linux-Desktop.git)
+cd SteamOS-Like-Session-Switcher-for-Linux-Desktop
 chmod +x install.sh
 sudo ./install.sh
-
-📖 Documentation & Wiki
-
-Qui è dove sposti tutto il "peso" tecnico. Questo mantiene il README leggero.
-
-For detailed information, please visit our Project Wiki. You will find:
-
-    Sudoers Setup: How to enable passwordless switching (essential!).
-
-    Architecture: How the Master/Helper system works.
-
-    Troubleshooting: Solutions for common display or session issues.
-
-🤝 Contributing & Support
-
-Questo chiude con il tono amichevole che abbiamo scelto.
-
-If you have any suggestions, feel free to open an Issue or a Pull Request. Being a gaming fanatic means I’m always looking for ways to improve this experience!
-
-If this project made your gaming life easier, don't forget to leave a ⭐!
