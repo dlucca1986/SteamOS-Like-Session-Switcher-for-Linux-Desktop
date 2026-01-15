@@ -1,18 +1,17 @@
-# 🎮 SteamOS Switcher for Desktop/Laptop
+## 🎮 SteamOS Switcher for Desktop/Laptop
 
-### "Bringing the Seamless SteamOS Experience to Linux Distribution (arch-based distro)"
+## "Bringing the Seamless SteamOS Experience to any Linux Distribution (Arch-based)"
 
 ## 🌟 About the Project
-Hi! I'm Daniele, 
-I developed this project to bridge the gap between standard Linux installations and the specialized Steam Deck UI (Gamescope).
-
-When running Steam on handheld devices like the ROG Ally, Legion Go, or even standard PCs, users often face broken "Switch to Desktop" buttons or infinite update loops. This project provides a clean, professional-grade set of scripts that emulate the original SteamOS behavior, making the "Game Mode" experience fluid and reliable for everyone.
+Hi, I'm Daniele, and I’m a hardcore gaming fanatic!
+If you love the Steam Deck gaming experience as much as I do, you’re in the right place. I developed this project to faithfully simulate the SteamOS ecosystem on standard desktops and laptops, bringing that seamless "console-like" feeling to a Linux machine.
 
 ## ✨ Key Features
-* **Seamless Session Switching:** Enables the "Switch to Desktop" button directly from the Steam Deck UI.
-* **Update System Emulation:** Correctly handles system update signals (Exit Code 7) to prevent UI errors.
-* **Professional Architecture:** Uses a "Master/Helper" structure in `/usr/local/bin` to ensure system integrity and avoid overwriting critical OS files.
-* **Handheld Ready:** Designed with handheld users in mind, ensuring compatibility with the Steam "Jupiter" ecosystem.
+* **Seamless Session Switching: No more clunky menus! This enables the "Switch to Desktop" button directly from a standalone gamescope-session, just like on a real Steam Deck. It takes you straight to your KDE Desktop without stopping at the login screen.
+  
+* **Clean & Safe Architecture: I care about your OS! Instead of overwriting critical system files, I use a "Master/Helper" structure in /usr/local/bin. Everything is handled by transparent, easy-to-read Bash scripts, making it professional, safe, and keeping your system clutter-free.
+
+* **One-Click Return to Gaming Mode: I’ve included a handy desktop shortcut! You’ll find a "Return to Gaming Mode" icon right on your KDE desktop, so you can jump back into your library with just one click.
 
 ## 🚀 Quick Start
 Open your terminal and run the following commands:
