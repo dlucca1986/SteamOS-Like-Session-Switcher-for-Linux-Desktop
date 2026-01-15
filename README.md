@@ -23,6 +23,15 @@ steamos-session-select:
 os-session-select: 
   A simple wrapper script used by the Steam Deck UI to trigger the return to the desktop session.
 
+steamos-set-timezone:
+  A compatibility placeholder that prevents errors when the Steam UI attempts to synchronize the system timezone.
+
+steamos-update: 
+  A wrapper script that directs system update requests from the Steam UI to the local update utility.
+
+jupiter-biosupdate: 
+  A wrapper for BIOS updates, ensuring the Steam UI can communicate with the hardware firmware tools.
+
 steam.desktop: 
   The session entry file.
   It must be placed in /usr/share/wayland-sessions/ to allow SDDM to recognize and launch the Gamescope/Steam Deck UI session.
