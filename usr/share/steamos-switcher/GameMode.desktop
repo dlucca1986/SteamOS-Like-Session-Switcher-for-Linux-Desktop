@@ -9,3 +9,12 @@ Terminal=false
 Type=Application
 StartupNotify=true
 Categories=Game;
+
+
+[Desktop Entry]
+Name=Return to Gaming Mode
+Exec=os-session-select gamescope-session-steam
+Icon=steam
+Terminal=false
+Type=Application
+Categories=System;
