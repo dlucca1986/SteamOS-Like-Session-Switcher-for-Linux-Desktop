@@ -57,12 +57,18 @@ This project wouldn't have been possible without the amazing work and guides fro
 * **Community Guides:** Big thanks to the developers and enthusiasts on **Reddit** (r/SteamDeck, r/LinuxGaming) and the **Arch Wiki** contributors.
 * **Open Source Contributors:** To everyone sharing scripts and ideas to make Linux a better place for gamers. 
 
+
 ---
+
 
 ## ❤️ Support the Project
 
 Built with ❤️ by a gaming fan for the Linux Community.  
 **If you like this project, please leave a ⭐ Star on GitHub!** It helps other gamers find it.
+
+
+---
+
 
 
 ## 🚀 Quick Installation
