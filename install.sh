@@ -7,38 +7,36 @@
 set -e
 
 echo "------------------------------------------------"
-echo "  Starting Installation of SteamOS Switcher  "
+echo "  Starting Installation of SteamOS Switcher     "
 echo "------------------------------------------------"
 
 # 1. Create necessary directories
-echo "[1/6] Creating system directories..."
+echo "[1/5] Creating system directories..."
 sudo mkdir -p /usr/local/bin
 sudo mkdir -p /usr/bin/steamos-polkit-helpers
 sudo mkdir -p /usr/share/wayland-sessions
 
-# 2. Install main scripts to /usr/local/bin
-echo "[2/6] Installing core scripts to /usr/local/bin..."
-sudo cp os-session-select steamos-session-select set-sddm-session gamescope-session steamos-select-branch /usr/local/bin/
+# 2. Install Master Scripts (The ones with exit logic) to /usr/bin/
+echo "[2/5] Installing master scripts to /usr/bin..."
+sudo cp steamos-update jupiter-biosupdate steamos-select-branch /usr/bin/
 
-# 3. Install polkit helpers to /usr/bin/steamos-polkit-helpers/
-echo "[3/6] Installing polkit dummy helpers..."
-sudo cp steamos-polkit-helpers/jupiter-biosupdate /usr/bin/steamos-polkit-helpers/
-sudo cp steamos-polkit-helpers/steamos-set-timezone /usr/bin/steamos-polkit-helpers/
-sudo cp steamos-polkit-helpers/steamos-update /usr/bin/steamos-polkit-helpers/
+# 3. Install Polkit Helpers (The ones with exec) to their subfolder
+echo "[3/5] Installing polkit helpers..."
+sudo cp steamos-polkit-helpers/* /usr/bin/steamos-polkit-helpers/
 
-# 4. Create symbolic links in /usr/bin (required by Steam Client)
-echo "[4/6] Creating symbolic links in /usr/bin..."
+# 4. Install Session Scripts to /usr/local/bin
+echo "[4/5] Installing session management scripts..."
+sudo cp os-session-select steamos-session-select set-sddm-session gamescope-session /usr/local/bin/
+# Create link for os-session-select as Steam expects it in /usr/bin
 sudo ln -sf /usr/local/bin/os-session-select /usr/bin/os-session-select
-sudo ln -sf /usr/local/bin/steamos-select-branch /usr/bin/steamos-select-branch
-# Links for updates and bios to ensure Steam finds them in the main path
-sudo ln -sf /usr/bin/steamos-polkit-helpers/steamos-update /usr/bin/steamos-update
-sudo ln -sf /usr/bin/steamos-polkit-helpers/jupiter-biosupdate /usr/bin/jupiter-biosupdate
 
-# 5. Install Desktop session files
-echo "[5/6] Installing Wayland session entries..."
+# 5. Set Permissions and Sessions
+echo "[5/5] Setting executable permissions and sessions..."
 sudo cp steam.desktop /usr/share/wayland-sessions/
+sudo chmod +x /usr/bin/steamos-update /usr/bin/jupiter-biosupdate /usr/bin/steamos-select-branch
+sudo chmod +x /usr/bin/steamos-polkit-helpers/*
+sudo chmod +x /usr/local/bin/*
 
-# 6. Set correct permissions
-echo "[6/6] Setting executable permissions..."
-sudo chmod +x /usr/local/bin/os-session-select
-sudo chmod +x /usr/local/bin/steamos-session
+echo "------------------------------------------------"
+echo "      Installation completed successfully!      "
+echo "------------------------------------------------"
