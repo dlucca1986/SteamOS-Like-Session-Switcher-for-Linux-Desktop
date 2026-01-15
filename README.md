@@ -91,3 +91,14 @@ git clone https://github.com/dlucca1986/SteamOS-Like-Session-Switcher-for-Linux-
 cd SteamOS-Like-Session-Switcher-for-Linux-Desktop
 chmod +x install.sh
 sudo ./install.sh
+
+```
+
+
+---
+
+
+## ⚠️ Mandatory Post-Installation Step
+
+To make the "Switch to Desktop" button work, you must authorize the session scripts to run without a password. Without this step, your system will hang on a black screen when switching.
+👉 Follow the Sudoers Setup Guide here
