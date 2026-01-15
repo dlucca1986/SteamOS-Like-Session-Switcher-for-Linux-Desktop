@@ -20,7 +20,7 @@ If you love the Steam Deck gaming experience as much as I do, you’re in the ri
 ## ✨ Key Features
 
 * **🔄 Seamless Session Switching**
-  No more clunky menus! This enables the **"Switch to Desktop"** button directly from a standalone gamescope-session, just like on a real Steam Deck. It takes you straight to your KDE Desktop without stopping at the login screen.
+No more clunky menus! This enables the **"Switch to Desktop"** button directly from a standalone gamescope-session, just like on a real Steam Deck. It takes you straight to your KDE Desktop without stopping at the login screen.
   
 * **🛡️ Clean & Safe Architecture**
   I care about your OS! Instead of overwriting critical system files, I use a **"Master/Helper" structure** in `/usr/local/bin`. Everything is handled by transparent, easy-to-read **Bash scripts**, making it professional, safe, and keeping your system clutter-free.
