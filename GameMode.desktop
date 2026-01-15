@@ -1,0 +1,17 @@
+[Desktop Entry]
+Comment[it_IT]=Ritorna alla sessione gamescope
+Comment=Ritorna alla sessione gamescope
+Exec=/usr/lib/os-session-select gamescope-session-steam
+GenericName[it_IT]=
+GenericName=
+Icon=steam
+MimeType=
+Name[it_IT]=Gamemode
+Name=Gamemode
+Path=
+StartupNotify=true
+Terminal=false
+TerminalOptions=
+Type=Application
+X-KDE-SubstituteUID=false
+X-KDE-Username=
