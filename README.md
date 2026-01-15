@@ -29,7 +29,10 @@ steam.desktop:
 
 
 GameMode.desktop:
-  A shortcut file that can be placed on your KDE Plasma desktop to switch to Gaming Mode with a single click.  
+  A shortcut file that can be placed on your KDE Plasma desktop to switch to Gaming Mode with a single click.
+  # Optional: Add a shortcut to your desktop to switch to Game Mode
+  - cp GameMode.desktop ~/Desktop/
+  - chmod +x ~/Desktop/GameMode.desktop
 
 
 
