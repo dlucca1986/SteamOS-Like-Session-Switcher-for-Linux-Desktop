@@ -8,15 +8,28 @@ What's inside ?
 
 
 set-sddm-session: 
-  The core logic. It writes a temporary configuration to /etc/sddm.conf.d/ to set the autologin session for the next boot and triggers a delayed restart of the Display     Manager.
+  The core logic.
+  It writes a temporary configuration to /etc/sddm.conf.d/ to set the autologin session for the next boot and triggers a delayed restart of the Display Manager.
 
 
 gamescope-session: 
-  The Game Mode launcher. It starts Steam with -steamdeck parameters inside a Gamescope standalone session.
+  The Game Mode launcher.
+  It starts Steam with -steamdeck parameters inside a Gamescope standalone session.
 
 
 steamos-session-select:
   A quick wrapper to call the system session selector and return to Plasma.
+
+os-session-select: 
+  A simple wrapper script used by the Steam Deck UI to trigger the return to the desktop session.
+
+steam.desktop: 
+  The session entry file.
+  It must be placed in /usr/share/wayland-sessions/ to allow SDDM to recognize and launch the Gamescope/Steam Deck UI session.
+
+
+GameMode.desktop:
+  A shortcut file that can be placed on your KDE Plasma desktop to switch to Gaming Mode with a single click.  
 
 
 
