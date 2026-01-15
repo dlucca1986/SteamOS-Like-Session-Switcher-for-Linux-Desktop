@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# --- TIMEZONE PLACEHOLDER ---
+# This script is a placeholder for the Steam Deck UI timezone setting feature.
+# It returns a success exit code (0) as timezone management is handled
+# by the host operating system (KDE Plasma or CLI).
+
+exit 0
