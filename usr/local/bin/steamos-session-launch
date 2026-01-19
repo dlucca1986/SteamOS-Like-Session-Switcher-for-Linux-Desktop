@@ -64,4 +64,4 @@ read -a FINAL_ARGS <<< "$(build_args)"
 # -e: Enables Steam Deck interface integration
 # -steamos3: Unlocks SteamOS specific menus and features in the UI
 exec gamescope "${FINAL_ARGS[@]}" -e -- \
-    steam -steamdeck -steamos -steamos3 -gamepadui
+    steam -steamdeck -steamos -steamos3
