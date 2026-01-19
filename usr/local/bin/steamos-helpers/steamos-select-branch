@@ -1,2 +1,37 @@
 #!/bin/bash
+# =============================================================================
+# SteamOS_Switcher - Release Channel Manager
+# =============================================================================
+# Script: steamos-select-branch
+# Description: Compatibility shim for SteamOS update channels (Stable/Beta/Main).
+#              On DIY systems, updates are managed via standard pacman mirrors.
+#              This script ensures UI compatibility within the Steam Client.
+# =============================================================================
+
+# --- Configuration & Styling ---
+readonly BLUE='\033[0;34m'
+readonly GREEN='\033[0;32m'
+readonly NC='\033[0m' # No Color
+
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+# --- Main Logic ---
+
+# Arguments handling: Steam passes the branch name (e.g., "stable", "beta")
+SELECTED_BRANCH=${1:-"stable"}
+
+log_info "SteamOS compatibility layer: intercepting branch switch request."
+log_info "Requested channel: ${SELECTED_BRANCH}"
+
+# Note: In a DIY environment, we do not want Steam to change Arch Linux mirrors
+# as it could break the rolling release. We acknowledge the request to keep
+# the UI responsive.
+
+log_info "Release channel '${SELECTED_BRANCH}' is currently synchronized with system mirrors."
+
+echo -e "${GREEN}✓ Branch selection finalized.${NC}"
+
+# Exit with success to prevent the Steam UI from hanging or showing an error
 exit 0
