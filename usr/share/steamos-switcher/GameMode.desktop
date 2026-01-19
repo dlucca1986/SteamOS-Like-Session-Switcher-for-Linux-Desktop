@@ -8,3 +8,19 @@ Type=Application
 StartupNotify=true
 Categories=System;Game;
 Keywords=steam;gamescope;deck;mode;
+
+
+[Desktop Entry]
+Name=Return to Gaming Mode
+Comment=Switch to Gamescope/Steam Deck UI session
+# Usiamo il nome dello script presente nei sudoers e nell'installer
+Exec=/usr/local/bin/os-session-select
+Icon=steam
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=System;Game;
+# Keywords utili per trovarlo velocemente nel menu K (KRunner)
+Keywords=steam;gamescope;deck;mode;switch;steamos;
+# Evita che appaia come un'app "sconosciuta" al primo avvio su Plasma 6
+X-KDE-SubstituteUID=false
