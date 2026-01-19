@@ -97,6 +97,10 @@ sudo ./install.sh
 ---
 
 
+
+Clean Install/Uninstall: I value your system's integrity. The installer provides a dedicated uninstaller script that reverts every change, including sudoers rules and symbolic links.
+
+
 ## ⚠️ Mandatory Post-Installation Step
 
 > "To achieve a seamless transition between Gaming Mode and Desktop, the session switcher requires permission to communicate with your Display Manager (SDDM) without a password prompt. Without this configuration, the 'Switch' command will fail. For security and stability, please follow the automated Sudoers setup."
