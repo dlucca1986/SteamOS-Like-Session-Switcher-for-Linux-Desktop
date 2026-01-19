@@ -1,2 +1,24 @@
 #!/bin/bash
+# =============================================================================
+# SteamOS_Switcher - System Update Manager
+# =============================================================================
+# Script: steamos-update
+# Description: Compatibility shim for SteamOS OTA update infrastructure.
+#              On DIY Arch Linux systems, updates are managed via pacman.
+#              This script ensures the Steam UI "Check for Updates" flow
+#              completes without errors.
+# Path:        /usr/local/bin/steamos-helpers/steamos-update
+# =============================================================================
+
+# --- Environment & Configuration ---
+# In a DIY environment, we avoid triggering a full system upgrade (pacman -Syu)
+# automatically from the Steam UI to prevent potential partial upgrades
+# or unexpected reboots. The user is expected to manage updates via terminal.
+
+# --- Main Logic ---
+
+# We return exit 0 to notify the Steam Client that the update check 
+# was successfully processed. This prevents the "Update Error" message
+# from appearing in the Gaming Mode overlay.
+
 exit 0
