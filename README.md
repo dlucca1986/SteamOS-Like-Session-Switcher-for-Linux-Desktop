@@ -70,6 +70,7 @@ Built with ❤️ by a gaming fan for the Linux Community.
 * **Desktop Environment**: KDE Plasma (6.x recommended).
 * **Display Manager**: SDDM (Required for session switching logic).
 * **Core Software**: `steam`, `gamescope`, `mangohud`, `gamemode`.
+* **Driver: Vulkan RADV**: (Handled automatically by the installer).
 
 
 ---
