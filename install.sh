@@ -141,6 +141,27 @@ optimize_performance() {
     fi
 }
 
+setup_pacman_hook() {
+    info "Setting up Pacman Hook for Gamescope capabilities..."
+    
+    sudo mkdir -p /etc/pacman.d/hooks
+    
+    sudo tee /etc/pacman.d/hooks/gamescope-capabilities.hook > /dev/null <<EOF
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = gamescope
+
+[Action]
+Description = Restoring Gamescope capabilities after update...
+When = PostTransaction
+Exec = /usr/bin/setcap 'cap_sys_admin,cap_sys_nice,cap_ipc_lock+ep' /usr/bin/gamescope
+EOF
+
+    success "Pacman hook created: Gamescope will keep its permissions after updates."
+}
+
 # --- Main Execution ---
 clear
 echo -e "${BLUE}==========================================${NC}"
