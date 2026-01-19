@@ -1,2 +1,3 @@
 #!/bin/bash
+# Punta al selettore nella cartella superiore
 /usr/local/bin/os-session-select "$1"
