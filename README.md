@@ -103,7 +103,9 @@ I value your system's integrity. This project is designed to be as non-intrusive
 
 
 ## 🗑️ Uninstallation
-If you wish to revert all changes, I’ve included a dedicated uninstaller. It will completely remove all scripts, symbolic links, desktop shortcuts, and the sudoers rule:
+If you wish to revert all changes, I’ve included a dedicated uninstaller. 
+
+It will completely remove all scripts, symbolic links, desktop shortcuts, and the sudoers rule:
 ```bash
 chmod +x uninstall.sh
 sudo ./uninstall.sh
