@@ -1,34 +1,48 @@
 #!/bin/bash
-# ==============================================================================
-# SteamOS Return-to-Desktop Manager
-# Restores the default SDDM session by removing the autologin override.
-# ==============================================================================
+# =============================================================================
+# SteamOs_Switcher - Session Restoration Manager
+# =============================================================================
+# Script: steamos-return
+# Description: Restores the default desktop session by removing autologin 
+#              overrides and restarting the display manager.
+# Path:        /usr/local/bin/steamos-return
+# Security:    Self-escalates via sudo using dedicated sudoers rules.
+# =============================================================================
 
-# 1. PRIVILEGE ESCALATION
-# Re-execute via sudo if not root, leveraging the steamos-switcher sudoers rule.
+# --- 1. Privilege Escalation ---
+# Automatically re-execute via sudo if not running as root.
 if [ "$EUID" -ne 0 ]; then
     exec sudo "$0" "$@"
 fi
 
-# 2. SILENT LOGGING
-# Redirecting output to a log file for background troubleshooting.
-LOG_FILE="/tmp/steamos-return.log"
+# --- 2. Configuration & Logging ---
+readonly LOG_FILE="/tmp/steamos-return.log"
+readonly AUTOLOGIN_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
+
+# Redirect STDOUT and STDERR to log for background diagnostics
 exec > "$LOG_FILE" 2>&1
 
-# 3. CLEANUP
-# Remove the autologin configuration and sync to disk.
-if [ -f "/etc/sddm.conf.d/zz-steamos-autologin.conf" ]; then
-    rm -f /etc/sddm.conf.d/zz-steamos-autologin.conf
-    sync
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Initiating return to desktop..."
+
+# --- 3. Cleanup Operations ---
+if [ -f "$AUTOLOGIN_CONF" ]; then
+    echo "Removing autologin override: $AUTOLOGIN_CONF"
+    rm -f "$AUTOLOGIN_CONF"
+    sync # Ensure filesystem consistency
+else
+    echo "No autologin override found. Proceeding with service restart."
 fi
 
-# 4. SYSTEMD-RUN MANEUVER (Enhanced)
-# We use systemd-run to decouple the restart from the current session.
-# This ensures the Display Manager restarts correctly even if this script
-# is terminated during the session teardown.
-systemd-run --unit=steamos-return --scope bash -c "
+# --- 4. Detached Service Restart ---
+# We use systemd-run to decouple the command from the current process tree.
+# This prevents the script from being killed when the session terminates.
+echo "Scheduling SDDM restart via systemd-run..."
+
+systemd-run --unit=steamos-return-session --description="SteamMachine DIY: Session Restore" --scope bash -c "
     sleep 1
+    echo 'Restarting Display Manager...'
     systemctl restart sddm
 " &
 
+# Exit immediately to allow the calling process (Steam) to close gracefully
 exit 0
