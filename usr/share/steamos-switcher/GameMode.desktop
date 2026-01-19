@@ -1,7 +1,6 @@
 [Desktop Entry]
 Name=Return to Gaming Mode
 Comment=Switch to Gamescope/Steam Deck UI session
-# Richiama lo switcher passando il parametro previsto dal case "steam"
 Exec=/usr/local/bin/os-session-select steam
 Icon=steam
 Terminal=false
