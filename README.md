@@ -1,4 +1,4 @@
-# 🎮 SteamMachine-DIY for Desktop/Laptop ( Full Amd Build ).
+# 🎮 SteamMachine-DIY for Desktop/Laptop ( Full Amd Build )
 Transform Arch Linux into a Steam Machine.
 
 Gaming Mode integration with HDR, VRR, and SteamOS sessions switcher.
@@ -14,7 +14,9 @@ Gaming Mode integration with HDR, VRR, and SteamOS sessions switcher.
 
 Hi, I'm **Daniele**, and I’m a hardcore gaming fanatic! 🕹️
 
-If you love the Steam Deck gaming experience as much as I do, you’re in the right place. I developed this project to faithfully simulate the **SteamOS ecosystem** on standard desktops and laptops, bringing that seamless "console-like" feeling to your Linux machine.
+If you love the Steam Deck gaming experience as much as I do, you’re in the right place. 
+
+I developed this project to faithfully simulate the **SteamOS ecosystem** on standard desktops and laptops, bringing that seamless "console-like" feeling to your Linux machine.
 
 
 ---
