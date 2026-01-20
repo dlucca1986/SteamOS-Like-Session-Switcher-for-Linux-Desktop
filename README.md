@@ -1,4 +1,7 @@
-# 🎮 SteamOS Switcher for Desktop/Laptop ( Full Amd Build )
+# 🎮 SteamMachine-DIY for Desktop/Laptop ( Full Amd Build ).
+Transform Arch Linux into a Steam Machine.
+
+Gaming Mode integration with HDR, VRR, and SteamOS sessions switcher.
 
 
 > ### "Bringing the Seamless SteamOS Experience to any Linux Distribution (Arch-based)" 🚀
