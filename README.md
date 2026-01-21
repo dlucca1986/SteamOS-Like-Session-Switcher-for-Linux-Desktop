@@ -1,4 +1,4 @@
-# 🎮 SteamMachine-DIY ( Full Amd Build ) --- W.I.P !!!!!!!!!
+# 🎮 SteamMachine-DIY (AMD & Intel Open Source Build)
 Transform Arch Linux into a Steam Machine.
 
 Gaming Mode integration and SteamOS sessions switcher.
@@ -79,7 +79,7 @@ Built with ❤️ by a gaming fan for the Linux Community.
 
 ## 🛠️ Prerequisites:
 
-* **GPU**: AMD Radeon (Required for full compatibility and RADV features).
+* **GPU**: AMD Radeon or Intel Graphics (Open Source Mesa drivers required).
 * **Desktop Environment**: KDE Plasma (6.x recommended).
 * **Display Manager**: SDDM (Required for session switching logic).
 * **Core Software**: `steam`, `gamescope`, `mangohud`, `gamemode`.
