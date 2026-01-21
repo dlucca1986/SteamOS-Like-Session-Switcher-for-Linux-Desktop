@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SteamOS_Switcher - Localization & Time Manager
+# SteamMachine-DIY - Localization & Time Manager
 # =============================================================================
 # Script: steamos-set-timezone
 # Description: Compatibility shim for SteamOS timezone synchronization.
