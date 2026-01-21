@@ -1,75 +1,80 @@
 #!/bin/bash
 # =============================================================================
-# SteamMachine-DIY - Gamescope Session Launcher (Hybrid Version)
+# SteamMachine-DIY - Gamescope Session Launcher (Universal Hybrid)
 # =============================================================================
-# Script: steamos-session-launch
-# Description: Orchestrates Gamescope with safe defaults and user overrides.
 # Path: /usr/local/bin/steamos-session-launch
 # =============================================================================
 
-# --- 1. Safe Mode Defaults (1080p @ 60Hz) ---
+# --- 1. Safe Mode Defaults (The "Parachute") ---
 TARGET_WIDTH=1920
 TARGET_HEIGHT=1080
 REFRESH_RATE=60
 ENABLE_HDR=0
 ENABLE_VRR=0
 ENABLE_MANGOAPP=1
+CUSTOM_ARGS="" # Vuoto di default
 
-# --- 2. Load User Configuration ---
+# --- 2. Configuration & Status Logic ---
 USER_CONFIG="$HOME/.config/steamos-diy/config"
+CONFIG_STATUS="SAFE MODE (1080p@60Hz)"
 
 if [ -f "$USER_CONFIG" ]; then
-    # Carica le variabili dell'utente sovrascrivendo i Safe Defaults
-    source "$USER_CONFIG"
-    CONFIG_STATUS="CUSTOM (Loaded from $USER_CONFIG)"
-else
-    CONFIG_STATUS="SAFE MODE (Default 1080p@60Hz)"
+    # Proviamo a caricare il file. Se c'è un errore di sintassi, source fallisce.
+    if source "$USER_CONFIG" 2>/dev/null; then
+        CONFIG_STATUS="CUSTOM (User settings applied)"
+        # Se l'utente ha usato il "Jolly", passiamo a Power User status
+        [[ -n "$CUSTOM_ARGS" ]] && CONFIG_STATUS="POWER USER (Custom Args Injected)"
+    else
+        CONFIG_STATUS="ERROR (Syntax error in config! Falling back to SAFE MODE)"
+    fi
 fi
 
 # --- 3. Environment & Logging ---
 readonly LOG_FILE="/tmp/gamescope-session.log"
 exec > "$LOG_FILE" 2>&1
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Session Initiation"
+echo "Targeting: $CONFIG_STATUS"
+
 # Toolkit & Session Identity
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=gamescope
 export GAMEMODE_AUTO=1
-
-# SteamOS Specific overrides
 export STEAM_USE_MANGOAPP=1
 export STEAM_MULTIPLE_XWAYLANDS=1
 
 # --- 4. Logic Functions ---
 
 build_args() {
-    # Base arguments
+    # Base arguments (Safe or User-defined)
     ARGS=(
         --output-width "$TARGET_WIDTH"
         --output-height "$TARGET_HEIGHT"
         --refresh "$REFRESH_RATE"
-        --always-epl      # Essential for Steam overlay focus
+        --always-epl
         --hide-cursor-delay 3000
     )
 
-    # Performance & Visual Features
+    # Standard Features
     [[ $ENABLE_HDR -eq 1 ]]      && ARGS+=(--hdr-enabled)
     [[ $ENABLE_VRR -eq 1 ]]      && ARGS+=(--adaptive-sync)
     [[ $ENABLE_MANGOAPP -eq 1 ]] && ARGS+=(--mangoapp)
+
+    # --- THE JOLLY (Power User Injection) ---
+    if [[ -n "$CUSTOM_ARGS" ]]; then
+        # Trasformiamo la stringa in array per gestire gli spazi correttamente
+        read -a INJECTED_ARGS <<< "$CUSTOM_ARGS"
+        ARGS+=("${INJECTED_ARGS[@]}")
+    fi
 
     echo "${ARGS[@]}"
 }
 
 # --- 5. Execution ---
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Gamescope Session..."
-echo "Status: $CONFIG_STATUS"
-echo "Current Parameters: ${TARGET_WIDTH}x${TARGET_HEIGHT}@${REFRESH_RATE}Hz"
-
-# Fetch constructed arguments
+echo "Final Resolution: ${TARGET_WIDTH}x${TARGET_HEIGHT}@${REFRESH_RATE}Hz"
 read -a FINAL_ARGS <<< "$(build_args)"
 
-# Final launch command
-# -e: Steam Deck interface integration
-# -steamos3: Unlocks specific SteamOS menus
+# Launch Gamescope -> Steam
 exec gamescope "${FINAL_ARGS[@]}" -e -- \
     steam -steamdeck -steamos -steamos3
