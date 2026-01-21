@@ -157,6 +157,8 @@ EOF
 
 deploy_scripts() {
     info "Deploying core binaries and helpers..."
+    
+    # Core Binaries
     local core_bins=(os-session-select set-sddm-session steamos-session-launch steamos-session-select)
     for bin in "${core_bins[@]}"; do
         if [ -f "$bin" ]; then
@@ -165,6 +167,7 @@ deploy_scripts() {
         fi
     done
     
+    # Helper Scripts
     local helper_scripts=(jupiter-biosupdate steamos-select-branch steamos-set-timezone steamos-update steamos-select-session)
     for helper in "${helper_scripts[@]}"; do
         if [ -f "$helper" ]; then
@@ -174,8 +177,28 @@ deploy_scripts() {
         fi
     done
 
+    # Deploy Desktop Resources (Icons & Session Entry)
+    info "Deploying desktop resources and session files..."
+    
+    # 1. Gaming Mode Session for SDDM
     if [ -f "steamos-switcher.desktop" ]; then
         sudo cp "steamos-switcher.desktop" "$SESSIONS_DIR/"
+    elif [ -f "resources/steamos-switcher.desktop" ]; then
+        sudo cp "resources/steamos-switcher.desktop" "$SESSIONS_DIR/"
+    fi
+
+    # 2. Return to Gaming Mode Icon (Data folder)
+    if [ -f "GameMode.desktop" ]; then
+        sudo cp "GameMode.desktop" "$DATA_DIR/"
+    elif [ -f "resources/GameMode.desktop" ]; then
+        sudo cp "resources/GameMode.desktop" "$DATA_DIR/"
+    fi
+
+    # 3. Create Desktop Shortcut for current user
+    if [ -f "$DATA_DIR/GameMode.desktop" ]; then
+        cp "$DATA_DIR/GameMode.desktop" "$HOME/Desktop/" 2>/dev/null || true
+        chmod +x "$HOME/Desktop/GameMode.desktop" 2>/dev/null || true
+        success "Desktop shortcut created."
     fi
 }
 
