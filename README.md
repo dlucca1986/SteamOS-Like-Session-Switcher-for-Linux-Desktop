@@ -31,7 +31,7 @@ I developed this project to faithfully simulate the **SteamOS ecosystem** on sta
   
   * **Standard Boot**: Launches at 1080p@60Hz by default for maximum compatibility.
    
-  * **Safety Watchdog**: If a session fails, it automatically triggers a Safe Mode (720p/60Hz) fallback to prevent black screens.
+  * **Safety Watchdog**:If a session fails to initialize, it automatically triggers a "Naked Recovery" fallback. This launches a pure session with dynamic resolution to prevent black screens and ensure system accessibility.
     
   * **Fully Customizable**: All parameters (Resolution, Refresh Rate, HDR, VRR) can be easily tweaked in your user config file.
 
