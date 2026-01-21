@@ -28,10 +28,14 @@ I developed this project to faithfully simulate the **SteamOS ecosystem** on sta
   Native support for the **"Switch to Desktop"** button. Transition between Gamescope and KDE Plasma without ever seeing a login screen or typing a password.
 
 * **🎮 Pure Console Experience**:
-  Pre-configured for **1080p/120Hz** with **HDR** and **Adaptive Sync (VRR)** out of the box.
+  Powered by a custom Watchdog system. If a session fails to start, it automatically triggers a Safe Mode (720p/60Hz) fallback to prevent black screens.
+
+* **📏 Hardware-Aware Scaling**: Automatically detects your monitor's limits to prevent "Out of Range" errors while allowing full customization via user config.
 
 * **🔴 Performance Ready**:
   Integrated with **Feral GameMode** and **MangoHud** for real-time monitoring and maximum CPU priority.
+  
+* **🧹 Argument Scrubbing**: Automatically cleans conflicting flags from your custom arguments to ensure a stable standalone session.
 
 
 ---
