@@ -2,10 +2,10 @@
 # =============================================================================
 # SteamMachine-DIY - Session Restore Manager
 # =============================================================================
-# Script: steamos-session-select
+# Script: steamos-session-select (steamos-return)
 # Description: Restores the default desktop session by removing autologin 
 #              overrides and restarting the display manager.
-# Path:        /usr/local/bin/steamos-return
+# Path:        /usr/local/bin/steamos-session-select
 # Security:    Self-escalates via sudo using dedicated sudoers rules.
 # =============================================================================
 
@@ -16,33 +16,34 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # --- 2. Configuration & Logging ---
-readonly LOG_FILE="/tmp/steamos-return.log"
+# Aligned with the project Master Log
+readonly LOG_FILE="/tmp/steamos-diy.log"
 readonly AUTOLOGIN_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
 
-# Redirect STDOUT and STDERR to log for background diagnostics
-exec > "$LOG_FILE" 2>&1
+# Redirect all output to the master log in append mode
+exec >> "$LOG_FILE" 2>&1
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Initiating return to desktop..."
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Session-Restore] Initiating return to desktop..."
 
 # --- 3. Cleanup Operations ---
 if [ -f "$AUTOLOGIN_CONF" ]; then
-    echo "Removing autologin override: $AUTOLOGIN_CONF"
+    echo "[INFO] Removing autologin override: $AUTOLOGIN_CONF"
     rm -f "$AUTOLOGIN_CONF"
-    sync # Ensure filesystem consistency
+    sync # Ensure filesystem consistency before restart
 else
-    echo "No autologin override found. Proceeding with service restart."
+    echo "[WARN] No autologin override found. SDDM might already be in default state."
 fi
 
 # --- 4. Detached Service Restart ---
 # We use systemd-run to decouple the command from the current process tree.
-# This prevents the script from being killed when the session terminates.
-echo "Scheduling SDDM restart via systemd-run..."
+# This ensures the restart signal survives the session termination.
+echo "[INFO] Scheduling SDDM restart via systemd-run..."
 
-systemd-run --unit=steamos-return-session --description="SteamMachine DIY: Session Restore" --scope bash -c "
+systemd-run --unit=steamos-return-session --description="SteamMachine-DIY: Session Restore" --scope bash -c "
     sleep 1
-    echo 'Restarting Display Manager...'
+    echo \"[$(date '+%Y-%m-%d %H:%M:%S')] [Session-Restore] Restarting Display Manager now.\" >> '$LOG_FILE'
     systemctl restart sddm
 " &
 
-# Exit immediately to allow the calling process (Steam) to close gracefully
+# Exit immediately to allow Steam to close its processes gracefully
 exit 0
