@@ -1,7 +1,7 @@
-# 🎮 SteamMachine-DIY ( Full Amd Build )
+# 🎮 SteamMachine-DIY ( Full Amd Build ) --- W.I.P !!!!!!!!!
 Transform Arch Linux into a Steam Machine.
 
-Gaming Mode integration with HDR, VRR, and SteamOS sessions switcher.
+Gaming Mode integration and SteamOS sessions switcher.
 
 
 > ### "Bringing the Seamless SteamOS Experience to any Linux Distribution (Arch-based)" 🚀
