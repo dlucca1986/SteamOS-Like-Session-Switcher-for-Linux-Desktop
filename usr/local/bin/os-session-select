@@ -3,38 +3,39 @@
 # SteamMachine-DIY - Core Session Manager
 # =============================================================================
 # Script: os-session-select
-# Description: Centralized logic for switching between Gaming Mode (Gamescope)
-#              and Desktop Mode (Plasma). Handles process termination and
-#              triggers SDDM session updates.
-# Path:        /usr/local/bin/os-session-select
+# Description: Centralized logic for switching between Gaming Mode and Desktop.
+# Path: /usr/local/bin/os-session-select
 # =============================================================================
 
 set -e
 
 # --- Configuration & Logging ---
-readonly LOG_FILE="/tmp/os-session-select.log"
+# Aligned with the project Master Log
+readonly LOG_FILE="/tmp/steamos-diy.log"
 readonly USER_NAME=$(id -un)
 readonly SDDM_HELPER="/usr/local/bin/set-sddm-session"
 
-# Redirect all output to log file for debugging
-exec > "$LOG_FILE" 2>&1
+# Redirect output in append mode (>>) to preserve launcher history
+exec >> "$LOG_FILE" 2>&1
 
 # --- Input Validation ---
 SESSION_INPUT=${1:-"steam"}
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Target session request: $SESSION_INPUT"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Session-Select] Request: $SESSION_INPUT"
 
 # --- Session Logic ---
-case "${SESSION_INPUT,,}" in # Convert to lowercase for robustness
+case "${SESSION_INPUT,,}" in
     "plasma"|"desktop")
+        # Must match /usr/share/wayland-sessions/plasma.desktop
         SESSION_FILE="plasma"
-        echo "Switching to Desktop Mode. Terminating Steam instances..."
-        # Gently terminate steam to allow cloud sync if possible
+        echo "Switching to Desktop Mode. Preparing logout..."
+        # Gently terminate Steam to allow Cloud Sync
         pkill -u "$USER_NAME" -TERM steam 2>/dev/null || true
         sleep 1
         ;;
     "gamescope-session-steam"|"steam"|"gaming"|"steamos")
-        SESSION_FILE="gamescope-session"
+        # Must match your steamos-switcher.desktop filename
+        SESSION_FILE="steamos-switcher"
         echo "Switching to Gaming Mode (Gamescope)."
         ;;
     *)
@@ -45,20 +46,20 @@ esac
 
 # --- Execution ---
 
-# Trigger the SDDM session update via the privileged helper
+# Trigger SDDM state update via the privileged helper
 if [ -f "$SDDM_HELPER" ]; then
-    echo "Calling SDDM helper: $SDDM_HELPER $SESSION_FILE $USER_NAME"
+    echo "Updating SDDM session to: $SESSION_FILE for user: $USER_NAME"
     sudo "$SDDM_HELPER" "$SESSION_FILE" "$USER_NAME"
     
     if [ $? -eq 0 ]; then
-        echo "Session state updated. Terminating current user session..."
-        sync # Ensure disk buffers are flushed before logout
+        echo "Session state updated successfully. Terminating current session..."
+        sync # Flush disk buffers before logout
         loginctl terminate-user "$USER_NAME"
     else
-        echo "Error: SDDM helper failed to update session state."
+        echo "[ERROR] SDDM helper failed to update session state."
         exit 1
     fi
 else
-    echo "Error: Critical component missing at $SDDM_HELPER"
+    echo "[ERROR] Critical component missing at $SDDM_HELPER"
     exit 1
 fi
