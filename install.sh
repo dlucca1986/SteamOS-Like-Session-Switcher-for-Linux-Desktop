@@ -29,11 +29,14 @@ USER_CONFIG_DIR="$HOME/.config/steamos-diy"
 USER_CONFIG_FILE="$USER_CONFIG_DIR/config"
 USER_README_FILE="$USER_CONFIG_DIR/README_PARAMETERS.txt"
 
-DEPENDENCIES=(
+# --- Packages Lists ---
+CORE_PKGS=(
     steam gamescope mangohud lib32-mangohud gamemode 
-    vulkan-icd-loader lib32-vulkan-icd-loader 
-    vulkan-radeon lib32-vulkan-radeon
+    vulkan-icd-loader lib32-vulkan-icd-loader mesa-utils
 )
+
+AMD_DRIVERS=(vulkan-radeon lib32-vulkan-radeon)
+INTEL_DRIVERS=(vulkan-intel lib32-vulkan-intel)
 
 # --- UI Functions ---
 info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -56,9 +59,26 @@ check_multilib() {
 }
 
 install_dependencies() {
-    info "Verifying system dependencies..."
+    info "Detecting GPU Hardware and verifying dependencies..."
+    
+    local pkgs_to_install=("${CORE_PKGS[@]}")
+    local gpu_info
+    gpu_info=$(lspci | grep -E "VGA|Display")
+
+    # Hardware Detection Logic
+    if echo "$gpu_info" | grep -iq "AMD"; then
+        success "AMD GPU detected. Adding RADV drivers to installation."
+        pkgs_to_install+=("${AMD_DRIVERS[@]}")
+    elif echo "$gpu_info" | grep -iq "Intel"; then
+        success "Intel GPU detected. Adding ANV drivers to installation."
+        pkgs_to_install+=("${INTEL_DRIVERS[@]}")
+    else
+        warn "Non-AMD/Intel GPU detected (Nvidia or Unknown). Installing core packages only."
+    fi
+
+    # Check for missing packages
     local missing_pkgs=()
-    for pkg in "${DEPENDENCIES[@]}"; do
+    for pkg in "${pkgs_to_install[@]}"; do
         if ! pacman -Qi "$pkg" &> /dev/null; then
             missing_pkgs+=("$pkg")
         fi
@@ -73,21 +93,21 @@ install_dependencies() {
         else
             error "Dependencies not met. Installation aborted."
         fi
+    else
+        success "All dependencies and drivers are already satisfied."
     fi
-    success "All dependencies satisfied."
 }
 
 setup_directories() {
     info "Creating system directories..."
     sudo mkdir -p "$HELPERS_SOURCE" "$SDDM_CONF_DIR" "$SESSIONS_DIR" "$DATA_DIR"
-    sudo mkdir -p "$HELPERS_LINKS" # For polkit compatibility symlinks
+    sudo mkdir -p "$HELPERS_LINKS"
 }
 
 setup_user_config() {
     info "Setting up user configuration in $USER_CONFIG_DIR..."
     mkdir -p "$USER_CONFIG_DIR"
 
-    # Create README_PARAMETERS.txt
     cat << 'EOF' > "$USER_README_FILE"
 ===========================================================
            STEAM MACHINE DIY - PARAMETERS GUIDE
@@ -116,7 +136,6 @@ to allow you to fix the parameters.
 ===========================================================
 EOF
 
-    # Create initial config only if it doesn't exist
     if [ ! -f "$USER_CONFIG_FILE" ]; then
         cat << EOF > "$USER_CONFIG_FILE"
 # SteamMachine-DIY User Configuration
@@ -139,7 +158,6 @@ EOF
 deploy_scripts() {
     info "Deploying core binaries and helpers..."
     
-    # Core Binaries
     local core_bins=(os-session-select set-sddm-session steamos-session-launch steamos-session-select)
     for bin in "${core_bins[@]}"; do
         if [ -f "$bin" ]; then
@@ -148,18 +166,15 @@ deploy_scripts() {
         fi
     done
     
-    # Helpers
     local helper_scripts=(jupiter-biosupdate steamos-select-branch steamos-set-timezone steamos-update steamos-select-session)
     for helper in "${helper_scripts[@]}"; do
         if [ -f "$helper" ]; then
             sudo cp "$helper" "$HELPERS_SOURCE/"
             sudo chmod +x "$HELPERS_SOURCE/$helper"
-            # Compatibility Symlinks
             sudo ln -sf "$HELPERS_SOURCE/$helper" "$HELPERS_LINKS/$helper"
         fi
     done
 
-    # Desktop Entries
     if [ -f "steamos-switcher.desktop" ]; then
         sudo cp "steamos-switcher.desktop" "$SESSIONS_DIR/"
     fi
