@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SteamOs_Switcher - Session Restoration Manager
+# SteamMachine-DIY - Session Restoration Manager
 # =============================================================================
 # Script: steamos-session-select
 # Description: Restores the default desktop session by removing autologin 
