@@ -41,7 +41,6 @@ export STEAM_USE_MANGOAPP=1
 export STEAM_MULTIPLE_XWAYLANDS=1
 
 # --- 4. Hardware Awareness (Fix for Mini-Laptops/Small Screens) ---
-# Detects physical screen limits to prevent "Out of Range" or Blur
 HW_MAX_RES=$(cat /sys/class/drm/*/modes 2>/dev/null | head -n 1)
 if [[ -n "$HW_MAX_RES" ]]; then
     HW_W=$(echo $HW_MAX_RES | cut -d'x' -f1)
@@ -54,8 +53,27 @@ if [[ -n "$HW_MAX_RES" ]]; then
     fi
 fi
 
-# --- 5. Logic Functions ---
+# --- 5. Argument Scrubbing Logic (ScopeBuddy Inspired) ---
+# This cleans CUSTOM_ARGS from redundant or breaking flags
+clean_custom_args() {
+    local raw_args=($CUSTOM_ARGS)
+    local cleaned=()
+    for arg in "${raw_args[@]}"; do
+        # Ignore -e and --steam as they are handled by the final execution line
+        # and would cause crashes if duplicated in standalone mode.
+        if [[ "$arg" == "-e" ]] || [[ "$arg" == "--steam" ]]; then
+            echo "[INFO] Scrubbing redundant/broken flag from CUSTOM_ARGS: $arg" >&2
+            continue
+        fi
+        cleaned+=("$arg")
+    done
+    echo "${cleaned[@]}"
+}
+
+# --- 6. Build Final Command ---
 build_args() {
+    local SCRUBBED_CUSTOM=$(clean_custom_args)
+    
     ARGS=(
         --output-width "$TARGET_WIDTH"
         --output-height "$TARGET_HEIGHT"
@@ -63,17 +81,19 @@ build_args() {
         --always-epl
         --hide-cursor-delay 3000
     )
+    
     [[ $ENABLE_HDR -eq 1 ]]      && ARGS+=(--hdr-enabled)
     [[ $ENABLE_VRR -eq 1 ]]      && ARGS+=(--adaptive-sync)
     [[ $ENABLE_MANGOAPP -eq 1 ]] && ARGS+=(--mangoapp)
-    if [[ -n "$CUSTOM_ARGS" ]]; then
-        read -a INJECTED_ARGS <<< "$CUSTOM_ARGS"
+    
+    if [[ -n "$SCRUBBED_CUSTOM" ]]; then
+        read -a INJECTED_ARGS <<< "$SCRUBBED_CUSTOM"
         ARGS+=("${INJECTED_ARGS[@]}")
     fi
     echo "${ARGS[@]}"
 }
 
-# --- 6. Execution & Watchdog (The Anti-BlackScreen Guard) ---
+# --- 7. Execution & Watchdog ---
 read -a FINAL_ARGS <<< "$(build_args)"
 echo "Final Parameters: ${TARGET_WIDTH}x${TARGET_HEIGHT}@${REFRESH_RATE}Hz"
 
@@ -89,10 +109,9 @@ if ! kill -0 $GAMESCOPE_PID 2>/dev/null; then
     # Rename corrupted config to prevent boot-loops
     [[ -f "$USER_CONFIG" ]] && mv "$USER_CONFIG" "${USER_CONFIG}.broken"
     
-    # Emergency Launch (Safe Defaults)
+    # Emergency Launch (Safe Defaults - 720p is universal)
     exec gamescope --output-width 1280 --output-height 720 --refresh 60 -e -- \
         steam -steamdeck -steamos -steamos3
 fi
 
-# If healthy, wait for the process to finish
 wait $GAMESCOPE_PID
