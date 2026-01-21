@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# SteamOs_Switcher - Gamescope Session Launcher
+# SteamMachine-DIY - Gamescope Session Launcher
 # =============================================================================
 # Script: steamos-session-launch
 # Description: Orchestrates the Gamescope compositor with optimized 
