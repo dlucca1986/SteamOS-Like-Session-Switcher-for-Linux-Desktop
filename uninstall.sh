@@ -13,7 +13,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # --- Configuration Paths ---
 HELPERS_SOURCE="/usr/local/bin/steamos-helpers"
@@ -24,16 +24,17 @@ SUDOERS_FILE="/etc/sudoers.d/steamos-switcher"
 AUTOLOGIN_CONF="$SDDM_CONF_DIR/zz-steamos-autologin.conf"
 SESSIONS_DIR="/usr/share/wayland-sessions"
 DATA_DIR="/usr/share/steamos-switcher"
+PACMAN_HOOK="/etc/pacman.d/hooks/gamescope-capabilities.hook"
 
 # --- User Config Path ---
 USER_CONFIG_DIR="$HOME/.config/steamos-diy"
-LOG_FILE="/tmp/steamos-diy.log"  # <--- ALLINEATO CON IL LAUNCHER
+LOG_FILE="/tmp/steamos-diy.log"
 
 # --- UI Functions ---
 info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error()    { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # --- Logic Functions ---
 
@@ -50,18 +51,20 @@ remove_scripts() {
     done
 
     # Helpers and Symlinks
-    # Rimuoviamo il contenuto prima della directory per sicurezza
+    # Removing compatibility symlinks directory
     if [ -d "$HELPERS_LINKS" ]; then
         sudo rm -rf "$HELPERS_LINKS"
-        info "Removed compatibility symlinks directory."
+        info "Removed compatibility symlinks directory ($HELPERS_LINKS)."
     fi
 
+    # Removing helper source directory
     if [ -d "$HELPERS_SOURCE" ]; then
         sudo rm -rf "$HELPERS_SOURCE"
-        info "Removed helper source directory."
+        info "Removed helper source directory ($HELPERS_SOURCE)."
     fi
 
     # Desktop Entries & Data
+    # Cleanup of session entry and data directory
     if [ -f "$SESSIONS_DIR/steamos-switcher.desktop" ]; then
         sudo rm -f "$SESSIONS_DIR/steamos-switcher.desktop"
         info "Removed SDDM session entry."
@@ -69,7 +72,13 @@ remove_scripts() {
 
     if [ -d "$DATA_DIR" ]; then
         sudo rm -rf "$DATA_DIR"
-        info "Removed $DATA_DIR"
+        info "Removed data directory $DATA_DIR"
+    fi
+
+    # Remove the user desktop shortcut if present
+    if [ -f "$HOME/Desktop/GameMode.desktop" ]; then
+        rm -f "$HOME/Desktop/GameMode.desktop"
+        info "Removed Desktop shortcut."
     fi
 }
 
@@ -78,7 +87,7 @@ remove_user_configs() {
     
     if [ -d "$USER_CONFIG_DIR" ]; then
         warn "Found user config directory: $USER_CONFIG_DIR"
-        read -p "Do you want to delete your custom settings and README? [y/N] " -n 1 -r
+        read -p "Do you want to delete your custom settings (resolution, HDR, etc.)? [y/N] " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$USER_CONFIG_DIR"
@@ -88,7 +97,6 @@ remove_user_configs() {
         fi
     fi
 
-    # Pulizia del file log allineato
     if [ -f "$LOG_FILE" ]; then
         rm -f "$LOG_FILE"
         info "Cleaned session logs from /tmp"
@@ -115,22 +123,27 @@ remove_sddm_configs() {
         sudo rm -f "$AUTOLOGIN_CONF"
         success "Autologin overrides removed."
     fi
+    
+    # SDDM State cleanup (restoring Plasma as default session)
+    if [ -f "/var/lib/sddm/state.conf" ]; then
+        info "Resetting SDDM last session state..."
+        sudo sed -i 's/Session=.*/Session=plasma/' /var/lib/sddm/state.conf 2>/dev/null || true
+    fi
 }
 
 revert_performance_tweaks() {
     info "Reverting Gamescope performance tweaks..."
     
-    # Remove Pacman Hook
-    if [ -f "/etc/pacman.d/hooks/gamescope-capabilities.hook" ]; then
-        sudo rm -f "/etc/pacman.d/hooks/gamescope-capabilities.hook"
+    # 1. Remove Pacman Hook
+    if [ -f "$PACMAN_HOOK" ]; then
+        sudo rm -f "$PACMAN_HOOK"
         info "Removed Gamescope Pacman hook."
     fi
 
-    # Remove Capabilities from binary
+    # 2. Remove File Capabilities from binary
     local gpath
     gpath=$(command -v gamescope)
     if [ -x "$gpath" ]; then
-        # Verifichiamo se getcap esiste e se ci sono effettivamente dei cap da rimuovere
         if command -v getcap >/dev/null && getcap "$gpath" | grep -q 'cap_'; then
             sudo setcap -r "$gpath"
             success "Capabilities removed from $gpath"
@@ -161,4 +174,4 @@ revert_performance_tweaks
 echo
 success "Uninstallation completed successfully!"
 info "KDE Plasma and SDDM have been restored to default behavior."
-info "A system reboot is recommended to clear temporary states."
+info "A system reboot is recommended to ensure all changes take effect."
