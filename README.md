@@ -1,4 +1,4 @@
-# 🎮 SteamMachine-DIY (AMD & Intel Open Source Build)
+# 🎮 SteamMachine-DIY (AMD & Intel Open Source Build)  W.I.P !!! ( not ready )
 Transform Arch Linux into a Steam Machine.
 
 Gaming Mode integration and SteamOS sessions switcher.
