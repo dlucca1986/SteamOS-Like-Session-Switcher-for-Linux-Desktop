@@ -1,49 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# SteamMachine-DIY - Session Restore Manager
+# SteamMachine-DIY - SteamOS Compatibility Wrapper
 # =============================================================================
-# Script: steamos-session-select (steamos-return)
-# Description: Restores the default desktop session by removing autologin 
-#              overrides and restarting the display manager.
-# Path:        /usr/local/bin/steamos-session-select
-# Security:    Self-escalates via sudo using dedicated sudoers rules.
+# Script: steamos-session-select
+# Description: Compatibility link for Steam's internal "Return to Desktop" call.
+# Redirects all logic to the central os-session-select manager.
 # =============================================================================
 
-# --- 1. Privilege Escalation ---
-# Automatically re-execute via sudo if not running as root.
-if [ "$EUID" -ne 0 ]; then
-    exec sudo "$0" "$@"
-fi
-
-# --- 2. Configuration & Logging ---
-# Aligned with the project Master Log
-readonly LOG_FILE="/tmp/steamos-diy.log"
-readonly AUTOLOGIN_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
-
-# Redirect all output to the master log in append mode
-exec >> "$LOG_FILE" 2>&1
-
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Session-Restore] Initiating return to desktop..."
-
-# --- 3. Cleanup Operations ---
-if [ -f "$AUTOLOGIN_CONF" ]; then
-    echo "[INFO] Removing autologin override: $AUTOLOGIN_CONF"
-    rm -f "$AUTOLOGIN_CONF"
-    sync # Ensure filesystem consistency before restart
-else
-    echo "[WARN] No autologin override found. SDDM might already be in default state."
-fi
-
-# --- 4. Detached Service Restart ---
-# We use systemd-run to decouple the command from the current process tree.
-# This ensures the restart signal survives the session termination.
-echo "[INFO] Scheduling SDDM restart via systemd-run..."
-
-systemd-run --unit=steamos-return-session --description="SteamMachine-DIY: Session Restore" --scope bash -c "
-    sleep 1
-    echo \"[$(date '+%Y-%m-%d %H:%M:%S')] [Session-Restore] Restarting Display Manager now.\" >> '$LOG_FILE'
-    systemctl restart sddm
-" &
-
-# Exit immediately to allow Steam to close its processes gracefully
-exit 0
+# We pass "plasma" as the target because this script is typically called 
+# by the Steam Deck UI when the user selects "Switch to Desktop".
+exec /usr/local/bin/os-session-select "plasma"
