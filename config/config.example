@@ -46,7 +46,6 @@ ENABLE_VRR=0
 #
 # USEFUL EXAMPLES:
 # - To use FSR (Better performance):  CUSTOM_ARGS="--upscaler fsr"
-# - For Nvidia scaling (NIS):        CUSTOM_ARGS="--upscaler nis"
 #
 # INTEL UHD 620 NOTE: The values below are essential to prevent flickering.
 CUSTOM_ARGS="--rt --disable-layers --disable-color-management"
