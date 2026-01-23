@@ -1,93 +1,97 @@
 #!/bin/bash
 # =============================================================================
-# SteamMachine-DIY - Session Manager
+# SteamMachine-DIY - Session Manager (os-session-select)
 # =============================================================================
-# Description: Centralized logic for switching between Gaming Mode and Desktop.
+# Version: 2.3.0
+# Description: Professional session switcher with ANSI styling.
 # Path: /usr/local/bin/os-session-select
+# License: MIT
 # =============================================================================
 
-set -e
+# Path: /us
+set -eou pipefail
 
-# --- Configuration & Logging ---
+# --- ANSI Colors ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# --- Configuration ---
+readonly HELPER_PATH="/usr/local/bin/set-sddm-session"
 readonly LOG_FILE="/tmp/steamos-diy.log"
-readonly USER_NAME=$(id -un)
-readonly SDDM_HELPER="/usr/local/bin/set-sddm-session"
+readonly TARGET_MODE="${1,,}"
 
-# Redirect output to master log for debugging
-exec >> "$LOG_FILE" 2>&1
+# --- User Identification ---
+if [[ -v SUDO_USER ]]; then
+    readonly CURRENT_USER="$SUDO_USER"
+else
+    readonly CURRENT_USER=$(id -u -n)
+fi
 
-# --- Input Validation ---
-SESSION_INPUT=${1:-"steam"}
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Session-Select] Switch request: $SESSION_INPUT"
+# --- Logging System ---
+log_message() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local color=$NC
 
-# --- Session Logic ---
-case "${SESSION_INPUT,,}" in
+    case "$level" in
+        "INFO")    color=$CYAN ;;
+        "EXEC")    color=$YELLOW ;;
+        "SUCCESS") color=$GREEN ;;
+        "ERROR")   color=$RED ;;
+    esac
+
+    local log_entry="[$timestamp] [$level] $message"
+
+    # Output a terminale (Bello e colorato)
+    echo -e "${color}${BOLD}[${level}]${NC} ${message}"
+
+    # Output su file (Pulito, senza codici colore ANSI)
+    echo "$log_entry" >> "$LOG_FILE" 2>/dev/null || true
+    logger -t SteamMachine-DIY "$log_entry"
+}
+
+# --- Header ---
+clear
+echo -e "${BLUE}${BOLD}==================================================${NC}"
+echo -e "${BLUE}${BOLD}   SteamMachine-DIY Session Manager v2.3.0        ${NC}"
+echo -e "${BLUE}${BOLD}==================================================${NC}"
+
+# --- Logic ---
+case "$TARGET_MODE" in
+    "steam"|"gamescope")
+        SESSION="steamos-switcher"
+        ;;
     "plasma"|"desktop")
-        SESSION_FILE="plasma"
-        echo "Action: Returning to Desktop Mode. Initiating graceful shutdown..."
-        
-        # 1. Graceful Steam Shutdown (Trigger Cloud Sync)
-        # Using official Steam command to ensure save games are uploaded
-        sudo -u "$USER_NAME" steam -shutdown &> /dev/null || true
-        
-        # 2. Universal Hardware Cleanup
-        # Wait for Steam to close before forcing the compositor to stop
-        sleep 2
-        
-        # 3. Hardware-Specific Safety (Intel/UHD Graphics Fix)
-        # Intel drivers often keep Gamescope/Xwayland in a 'paused' state.
-        # Force killing these ensures the DRM lease is released for Plasma.
-        echo "Cleaning up display processes (SIGKILL)..."
-        pkill -9 gamescope || true
-        pkill -9 Xwayland || true
+        SESSION="plasma"
+        if pgrep -u "$CURRENT_USER" -x "steam" > /dev/null; then
+            log_message "INFO" "Steam detected. Sending shutdown signal for $CURRENT_USER..."
+            sudo -u "$CURRENT_USER" steam -shutdown || true
+            sleep 1
+        fi
         ;;
-
-    "gamescope-session-steam"|"steam"|"gaming"|"steamos")
-        # Ensure this matches your /usr/share/wayland-sessions/ file name
-        SESSION_FILE="steamos-switcher"
-        echo "Action: Entering Gaming Mode (Gamescope)."
-        ;;
-
     *)
-        echo "[ERROR] Invalid session requested: $SESSION_INPUT"
+        echo -e "${RED}${BOLD}Error:${NC} Invalid target mode."
+        echo -e "${YELLOW}Usage:${NC} $0 {steam|plasma}"
         exit 1
         ;;
 esac
 
 # --- Execution ---
+log_message "EXEC" "Switching session to: ${BOLD}$SESSION${NC}"
 
-# Check for the privileged SDDM helper
-if [ -f "$SDDM_HELPER" ]; then
-    echo "Updating SDDM state: Session=$SESSION_FILE, User=$USER_NAME"
-    
-    # Toggle Autologin via Helper
-    if [[ "$SESSION_FILE" == "plasma" ]]; then
-        # Passing empty user to helper signals removal of autologin override
-        sudo "$SDDM_HELPER" "plasma" ""
-    else
-        sudo "$SDDM_HELPER" "$SESSION_FILE" "$USER_NAME"
-    fi
-    
-    # Verify helper success and restart Display Manager
-    if [ $? -eq 0 ]; then
-        echo "State updated. Dispatching SDDM restart via systemd-run..."
-        sync # Commit filesystem buffers
-        
-        # Use systemd-run to detach the restart command from the current session.
-        # This prevents the script from killing itself before SDDM can restart.
-        systemd-run --unit=steamos-restart-sddm --description="SteamMachine-DIY: Session Reset" --scope bash -c "
-            sleep 1
-            systemctl restart sddm
-        " &
-        
-        # Log out the user if entering Gaming Mode for a clean slate
-        [[ "$SESSION_FILE" != "plasma" ]] && loginctl terminate-user "$USER_NAME"
-        exit 0
-    else
-        echo "[ERROR] SDDM helper failed to update configuration."
-        exit 1
-    fi
+if sudo "$HELPER_PATH" "$SESSION" "$CURRENT_USER"; then
+    log_message "SUCCESS" "Handover complete. Restarting session for $CURRENT_USER..."
+    echo -e "${BLUE}--------------------------------------------------${NC}"
+    # Piccola pausa per far leggere il messaggio di successo all'utente
+    sleep 1
+    exec loginctl terminate-user "$CURRENT_USER"
 else
-    echo "[ERROR] Critical component missing at $SDDM_HELPER"
+    log_message "ERROR" "Helper failed to update SDDM state. Check permissions."
     exit 1
 fi
