@@ -11,10 +11,9 @@
 
 set -eou pipefail
 
-# --- ANSI Colors (High Intensity for Root) ---
+# --- ANSI Colors ---
 RED='\033[1;31m'
 GREEN='\033[1;32m'
-YELLOW='\033[1;33m'
 MAGENTA='\033[1;35m'
 CYAN='\033[1;36m'
 BOLD='\033[1m'
@@ -24,7 +23,6 @@ NC='\033[0m'
 readonly SDDM_CONF_DIR="/etc/sddm.conf.d"
 readonly SDDM_CONF_FILE="${SDDM_CONF_DIR}/zz-steamos-autologin.conf"
 readonly LOG_FILE="/tmp/steamos-diy.log"
-readonly RESTART_DELAY="2s"
 
 # Input Arguments
 readonly SESSION_NAME=$(basename "${1:-steamos-switcher}" .desktop)
@@ -43,33 +41,31 @@ log_helper() {
         "ERROR")   color=$RED ;;
     esac
 
-    local log_entry="[$timestamp] [HELPER-$level] $message"
+    # Output a terminale solo se interattivo
+    if [[ -t 1 ]]; then
+        echo -e "${MAGENTA}${BOLD}[HELPER]${NC} ${color}${message}${NC}"
+    fi
 
-    # Terminal Output (Bold for emphasis)
-    echo -e "${MAGENTA}${BOLD}[HELPER]${NC} ${color}${message}${NC}"
-
-    # Clean File Output
-    echo "$log_entry" >> "$LOG_FILE" 2>/dev/null || true
-    logger -t SteamMachine-DIY "$log_entry"
+    echo "[$timestamp] [HELPER-$level] $message" >> "$LOG_FILE" 2>/dev/null || true
+    logger -t SteamMachine-DIY "[HELPER-$level] $message"
 }
 
 # --- Validation ---
 if [[ $EUID -ne 0 ]]; then
-    echo -e "${RED}${BOLD}CRITICAL ERROR:${NC} This script must be run as root (via sudo)"
+    echo -e "${RED}${BOLD}CRITICAL ERROR:${NC} Must be run as root"
     exit 1
 fi
 
 if [[ -z "$USER_NAME" ]]; then
-    log_helper "ERROR" "Execution failed: No target username provided."
+    log_helper "ERROR" "No target username provided."
     exit 1
 fi
 
 # --- Atomic Configuration Write ---
-log_helper "INFO" "Applying SDDM State -> User: $USER_NAME | Session: $SESSION_NAME"
+log_helper "INFO" "Updating SDDM for $USER_NAME (Session: $SESSION_NAME)"
 
 mkdir -p "$SDDM_CONF_DIR"
 
-# Creazione file temporaneo
 TMP_FILE=$(mktemp)
 cat <<EOF > "$TMP_FILE"
 [Autologin]
@@ -78,22 +74,11 @@ Session=$SESSION_NAME
 Relogin=false
 EOF
 
-# Spostamento atomico
 if mv "$TMP_FILE" "$SDDM_CONF_FILE"; then
     chmod 644 "$SDDM_CONF_FILE"
-    log_helper "SUCCESS" "SDDM Configuration successfully updated."
+    log_helper "SUCCESS" "SDDM Configuration applied."
 else
     rm -f "$TMP_FILE"
-    log_helper "ERROR" "Failed to move configuration file."
+    log_helper "ERROR" "Failed to update configuration."
     exit 1
 fi
-
-# --- Hardware Reset (Intel UHD 620 Fix) ---
-log_helper "INFO" "Intel GPU Reset: Scheduling SDDM restart in ${YELLOW}$RESTART_DELAY${NC}..."
-
-# Esecuzione asincrona via systemd-run
-systemd-run --description="SteamMachine-DIY SDDM Restart" \
-            --on-active="$RESTART_DELAY" \
-            /usr/bin/systemctl restart sddm
-
-echo -e "${MAGENTA}${BOLD}==================================================${NC}"
