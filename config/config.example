@@ -1,1 +1,64 @@
+# =============================================================================
+#              STEAM MACHINE DIY - CONFIGURATION GUIDE
+# =============================================================================
+# WELCOME! This is your control panel.
+# The Launcher reads this file every time you start the SteamOS session.
+#
+# WHERE TO EDIT: 
+# Modify the values in this file (~/.config/steamos-diy/config).
+# If it's missing, the Launcher will auto-detect your hardware and create one.
+#
+# --- THE GOLDEN RULES (Read this or it WILL break!) ---
+# CORRECT:  VARIABLE=value           (No spaces!)
+# WRONG:    VARIABLE = value         (DO NOT put spaces around the '=')
+# WRONG:    VARIABLE= value          (DO NOT put a space after the '=')
+# WRONG:    VARIABLE =value          (DO NOT put a space before the '=')
+# =============================================================================
 
+# --- [ 1. SCREEN SIZE (Resolution) ] ---
+# What is your TV or Monitor resolution?
+# If left empty, the Launcher will try to guess (Auto-Detection).
+# Common examples: 
+# - 4K (Ultra HD): 3840x2160
+# - 1080p (Full HD): 1920x1080
+# - Steam Deck: 1280x800
+TARGET_WIDTH=1920
+TARGET_HEIGHT=1080
+
+# --- [ 2. SMOOTHNESS (Refresh Rate) ] ---
+# How many times per second the screen updates. Standard TV = 60.
+REFRESH_RATE=60
+
+# --- [ 3. ON/OFF SWITCHES ] ---
+# Use 1 for YES (Enabled) or 0 for NO (Disabled).
+
+# Show FPS counter and CPU/GPU usage while gaming? (Requires MangoHud)
+ENABLE_MANGOAPP=1
+
+# HDR (Deep Colors): Only use this if your TV supports HDR10.
+ENABLE_HDR=0
+
+# VRR (FreeSync/G-Sync): Use this only if your monitor supports it.
+ENABLE_VRR=0
+
+# --- [ 4. PRO SETTINGS (The "Magic Line") ] ---
+# Add extra Gamescope commands inside the quotes.
+#
+# USEFUL EXAMPLES:
+# - To use FSR (Better performance):  CUSTOM_ARGS="--upscaler fsr"
+# - For Nvidia scaling (NIS):        CUSTOM_ARGS="--upscaler nis"
+#
+# INTEL UHD 620 NOTE: The values below are essential to prevent flickering.
+CUSTOM_ARGS="--rt --disable-layers --disable-color-management"
+
+# ! DANGER ZONE - WHAT IF THE SYSTEM CRASHES? !
+# =============================================================================
+# If you enter a wrong value and Steam fails to start:
+#
+# 1. WATCHDOG: The Launcher detects if the session lasts less than 3 seconds.
+# 2. SAFE MODE: The Launcher automatically restarts itself with the 
+#    '--safe-mode' flag.
+# 3. RECOVERY: In Safe Mode, your custom 'config' file is COMPLETELY IGNORED.
+#    The system will use emergency defaults to let you reach the UI
+#    and fix your settings in this file.
+# =============================================================================
