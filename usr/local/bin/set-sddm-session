@@ -9,76 +9,64 @@
 # License: MIT
 # =============================================================================
 
-set -eou pipefail
-
-# --- ANSI Colors ---
-RED='\033[1;31m'
-GREEN='\033[1;32m'
-MAGENTA='\033[1;35m'
-CYAN='\033[1;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+-eou pipefail
 
 # --- Configuration ---
-readonly SDDM_CONF_DIR="/etc/sddm.conf.d"
-readonly SDDM_CONF_FILE="${SDDM_CONF_DIR}/zz-steamos-autologin.conf"
 readonly LOG_FILE="/tmp/steamos-diy.log"
+readonly SDDM_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
 
-# Input Arguments
+# Inputs
 readonly SESSION_NAME=$(basename "${1:-steamos-switcher}" .desktop)
 readonly USER_NAME="${2:-}"
 
-# --- Logging System ---
-log_helper() {
-    local level="$1"
-    local message="$2"
+# --- UI Styling (Aligned with os-session-select) ---
+BOLD='\033[1m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# --- Functions ---
+log_info() {
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    local color=$NC
+    echo -e "${CYAN}${BOLD}[INFO]${NC} $1"
+    echo "[$timestamp] [HELPER] $1" >> "$LOG_FILE" 2>/dev/null || true
+}
 
-    case "$level" in
-        "INFO")    color=$CYAN ;;
-        "SUCCESS") color=$GREEN ;;
-        "ERROR")   color=$RED ;;
-    esac
-
-    # Output a terminale solo se interattivo
-    if [[ -t 1 ]]; then
-        echo -e "${MAGENTA}${BOLD}[HELPER]${NC} ${color}${message}${NC}"
-    fi
-
-    echo "[$timestamp] [HELPER-$level] $message" >> "$LOG_FILE" 2>/dev/null || true
-    logger -t SteamMachine-DIY "[HELPER-$level] $message"
+log_error() {
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}${BOLD}[ERROR]${NC} $1" >&2
+    echo "[$timestamp] [HELPER_ERROR] $1" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 # --- Validation ---
 if [[ $EUID -ne 0 ]]; then
-    echo -e "${RED}${BOLD}CRITICAL ERROR:${NC} Must be run as root"
+    log_error "This helper must be run as root (via sudo)."
     exit 1
 fi
 
-if [[ -z "$USER_NAME" ]]; then
-    log_helper "ERROR" "No target username provided."
-    exit 1
-fi
-
-# --- Atomic Configuration Write ---
-log_helper "INFO" "Updating SDDM for $USER_NAME (Session: $SESSION_NAME)"
-
-mkdir -p "$SDDM_CONF_DIR"
-
-TMP_FILE=$(mktemp)
-cat <<EOF > "$TMP_FILE"
+# --- Logic ---
+if [[ -n "$USER_NAME" ]]; then
+    log_info "Updating SDDM autologin: User=${GREEN}$USER_NAME${NC}, Session=${GREEN}$SESSION_NAME${NC}"
+    
+    # Atomic configuration write
+    mkdir -p "$(dirname "$SDDM_CONF")"
+    cat <<EOF > "$SDDM_CONF"
 [Autologin]
 User=$USER_NAME
 Session=$SESSION_NAME
 Relogin=false
 EOF
-
-if mv "$TMP_FILE" "$SDDM_CONF_FILE"; then
-    chmod 644 "$SDDM_CONF_FILE"
-    log_helper "SUCCESS" "SDDM Configuration applied."
+    chmod 644 "$SDDM_CONF"
 else
-    rm -f "$TMP_FILE"
-    log_helper "ERROR" "Failed to update configuration."
-    exit 1
+    log_info "${RED}No username provided.${NC} Clearing autologin configuration..."
+    rm -f "$SDDM_CONF"
 fi
+
+# --- Execution ---
+log_info "Scheduling SDDM restart in 1 second..."
+
+# Detach the restart from the current process to prevent graphical deadlocks.
+systemd-run --description="SteamMachine-DIY SDDM Restart" \
+            --on-active=1 \
+            /usr/bin/systemctl restart sddm
