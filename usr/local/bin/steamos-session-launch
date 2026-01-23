@@ -1,106 +1,137 @@
 #!/bin/bash
 # =============================================================================
-# SteamMachine-DIY - Universal Gamescope Session Launcher
+# SteamMachine-DIY - Intelligent Universal Launcher
 # =============================================================================
+# Version: 2.3.9
+# Description:  Fail-safe launcher with --safe-mode Relaunch & Additive Logging.
 # Path: /usr/local/bin/steamos-session-launch
-# Description: Ultra-robust core launcher with "Safe Mode" and minimal dependencies.
+# License:MIT
 # =============================================================================
 
-# --- 1. Safe Mode Defaults ---
-TARGET_WIDTH=1920
-TARGET_HEIGHT=1080
-REFRESH_RATE=60
-ENABLE_MANGOAPP=1
-CUSTOM_ARGS=""
+set -eou pipefail
 
-# --- 2. User Configuration Loading ---
-USER_CONFIG="$HOME/.config/steamos-diy/config"
-CONFIG_STATUS="SAFE MODE"
-
-if [ -f "$USER_CONFIG" ]; then
-    if source "$USER_CONFIG" 2>/dev/null; then
-        CONFIG_STATUS="CUSTOM (User settings applied)"
-    else
-        CONFIG_STATUS="ERROR (Syntax error in config! Falling back to SAFE MODE)"
-    fi
-fi
-
-# --- 3. Environment & Logging ---
+# --- Configuration & Paths ---
 readonly LOG_FILE="/tmp/steamos-diy.log"
-exec > "$LOG_FILE" 2>&1
+readonly CONFIG_DIR="$HOME/.config/steamos-diy"
+readonly CONFIG_FILE="$CONFIG_DIR/config"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Launcher] Initiating session: $CONFIG_STATUS"
+# --- ANSI Color Codes ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Standard SteamOS Environment Variables
-export XDG_SESSION_TYPE=wayland
-export XDG_CURRENT_DESKTOP=gamescope
-export STEAM_USE_MANGOAPP=1
-export STEAM_MULTIPLE_XWAYLANDS=1
+# --- 0. Mode Detection & Log Initialization ---
+# Check if the script was relaunched in Safe Mode
+SAFE_MODE=false
+[[ "${1:-}" == "--safe-mode" ]] && SAFE_MODE=true
 
-# Failsafe Gamemode activation via environment variable instead of wrapper
-export GAMEMODE_AUTO=1
-
-# Essential Intel/Integrated GPU Stability fix
-export WBC_DISABLE_MODIFIERS=1 
-
-# --- 4. Hardware Awareness ---
-HW_MAX_RES=$(cat /sys/class/drm/*/modes 2>/dev/null | head -n 1)
-if [[ -n "$HW_MAX_RES" ]]; then
-    HW_W=$(echo $HW_MAX_RES | cut -d'x' -f1)
-    HW_H=$(echo $HW_MAX_RES | cut -d'x' -f2)
-    if [ "$TARGET_WIDTH" -gt "$HW_W" ] || [ "$TARGET_HEIGHT" -gt "$HW_H" ]; then
-        echo "[WARN] Resolution adjustment: ${TARGET_WIDTH}x${TARGET_HEIGHT} -> ${HW_W}x${HW_H}"
-        TARGET_WIDTH=$HW_W
-        TARGET_HEIGHT=$HW_H
-    fi
+if [ "$SAFE_MODE" = false ]; then
+    # Standard Boot: Clear log for a new session
+    echo -e "${CYAN}[$(date '+%Y-%m-%d %H:%M:%S')] [SYSTEM] Starting new session. Logging initialized.${NC}" > "$LOG_FILE"
+else
+    # Recovery Boot: Append separator and recovery message
+    {
+        echo -e "${YELLOW}------------------------------------------------------------${NC}"
+        echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] [RECOVERY] SAFE MODE ACTIVE: Environment Cleaned.${NC}"
+        echo -e "${YELLOW}------------------------------------------------------------${NC}"
+    } >> "$LOG_FILE"
 fi
 
-# --- 5. Argument Build Logic ---
-build_args() {
-    # Core stability flags
-    ARGS=(
-        --output-width "$TARGET_WIDTH"
-        --output-height "$TARGET_HEIGHT"
-        --refresh "$REFRESH_RATE"
-        --always-epl
-        --disable-modifiers
-        --hide-cursor-delay 3000
-        --fade-out-duration 200
-        -e
-    )
+log_launch() {
+    local LEVEL="$1"
+    local MESSAGE="$2"
+    local COLOR="$NC"
 
-    [[ $ENABLE_MANGOAPP -eq 1 ]] && ARGS+=(--mangoapp)
-    
-    # User custom arguments from config file
-    if [[ -n "$CUSTOM_ARGS" ]]; then
-        # Scrubbing redundant flags
-        local CLEANED_ARGS=$(echo "$CUSTOM_ARGS" | sed 's/-e//g; s/--steam//g')
-        read -a INJ <<< "$CLEANED_ARGS"
-        ARGS+=("${INJ[@]}")
-    fi
-    echo "${ARGS[@]}"
+    case "$LEVEL" in
+        "INFO")     COLOR="$CYAN" ;;
+        "SUCCESS")  COLOR="$GREEN" ;;
+        "WARN")     COLOR="$YELLOW" ;;
+        "ERROR")    COLOR="$RED" ;;
+        "RECOVERY") COLOR="$YELLOW" ;;
+    esac
+
+    local _msg="[$(date '+%Y-%m-%d %H:%M:%S')] [${LEVEL}] ${MESSAGE}"
+
+    # Write to log file with ANSI colors preserved
+    echo -e "${COLOR}${_msg}${NC}" >> "$LOG_FILE" 2>/dev/null || true
+    # Send clean message to system journal
+    logger -t SteamMachine-DIY "$_msg"
 }
 
-# --- 6. Execution & Watchdog ---
-read -a FINAL_ARGS <<< "$(build_args)"
-echo "[Launcher] Final Parameters: ${TARGET_WIDTH}x${TARGET_HEIGHT}@${REFRESH_RATE}Hz"
+# --- 1. Hardware Auto-Detection ---
+# Skip user config and auto-detection in Safe Mode for maximum stability
+if [ "$SAFE_MODE" = false ]; then
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        log_launch "INFO" "Config file missing. Detecting hardware..."
+        mkdir -p "$CONFIG_DIR"
 
-# Launch Gamescope directly (letting GAMEMODE_AUTO handle the rest)
-gamescope "${FINAL_ARGS[@]}" -- steam -steamos -gamepadui -steamdeck &
-GAMESCOPE_PID=$!
+        ACTIVE_PATH=$(grep -l "^connected" /sys/class/drm/card*-*/status | head -n1 || true)
+        if [[ -n "$ACTIVE_PATH" ]]; then
+            ACTIVE_DIR=$(dirname "$ACTIVE_PATH")
+            _CONN_NAME=$(basename "$ACTIVE_DIR")
+            _RES=$(head -n1 "$ACTIVE_DIR/modes" 2>/dev/null || echo "1280x720")
+            _W=$(echo "$_RES" | cut -d'x' -f1)
+            _H=$(echo "$_RES" | cut -d'x' -f2)
+            log_launch "SUCCESS" "Detected: ${_CONN_NAME} (${_W}x${_H})"
+        else
+            log_launch "WARN" "No display detected. Using 720p defaults."
+            _W=1280; _H=720
+        fi
 
-sleep 5 # Monitoring window for startup stability
+        cat <<EOF > "$CONFIG_FILE"
+# STEAM MACHINE DIY - CONFIGURATION
+TARGET_WIDTH=${_W:-1280}
+TARGET_HEIGHT=${_H:-720}
+REFRESH_RATE=60
+ENABLE_MANGOAPP=0
+ENABLE_HDR=0
+CUSTOM_ARGS="--rt --disable-layers --disable-color-management"
+EOF
+    fi
 
-if ! kill -0 $GAMESCOPE_PID 2>/dev/null; then
-    echo "[CRITICAL] Startup failed! Triggering Naked Recovery..."
-    
-    # Isolate potentially broken user config
-    [[ -f "$USER_CONFIG" ]] && mv "$USER_CONFIG" "${USER_CONFIG}.broken"
-    
-    # --- Naked Recovery ---
-    # Purest form: no gamemoderun, no custom args, no complex logic.
-    echo "[INFO] Emergency Fallback: Native Resolution, Safe Flags Only"
-    exec gamescope --disable-modifiers --always-epl -e -n -- steam -steamdeck -steamos3
+    # --- 2. Load Config & Build Argument Array ---
+    # shellcheck source=/dev/null
+    source "$CONFIG_FILE"
+    G_ARGS=("-e")
+    [[ -n "${TARGET_WIDTH:-}" ]]  && G_ARGS+=("-W" "$TARGET_WIDTH")
+    [[ -n "${TARGET_HEIGHT:-}" ]] && G_ARGS+=("-H" "$TARGET_HEIGHT")
+    [[ -n "${REFRESH_RATE:-}" ]]  && G_ARGS+=("-r" "$REFRESH_RATE")
+    [[ "${ENABLE_MANGOAPP:-0}" == "1" ]] && export STEAM_USE_MANGOAPP=1
+    [[ "${ENABLE_HDR:-0}" == "1" ]]      && G_ARGS+=("--hdr-enabled")
+
+    if [[ -n "${CUSTOM_ARGS:-}" ]]; then
+        read -r -a EXTRA_ARGS <<< "$CUSTOM_ARGS"
+        G_ARGS+=("${EXTRA_ARGS[@]}")
+    fi
+else
+    log_launch "WARN" "Skipping user config and exports for stability."
 fi
 
-wait $GAMESCOPE_PID
+# --- 3. Execution & Watchdog ---
+if [ "$SAFE_MODE" = false ]; then
+    log_launch "INFO" "Launching Primary: gamescope ${G_ARGS[*]}"
+    echo "--- GAMESCOPE PRIMARY START ---" >> "$LOG_FILE"
+
+    START_TIME=$(date +%s)
+    # Launch gamescope and pipe all output to log
+    gamescope "${G_ARGS[@]}" -- steam -steamdeck -steamos3 >> "$LOG_FILE" 2>&1
+    DURATION=$(( $(date +%s) - START_TIME ))
+
+    # Watchdog: If session lasts less than 3 seconds, trigger recovery
+    if [ "$DURATION" -lt 3 ]; then
+        log_launch "ERROR" "Primary failed after ${DURATION}s."
+        log_launch "RECOVERY" "Triggering atomic relaunch in --safe-mode..."
+        sleep 1
+        exec "$0" --safe-mode
+    else
+        log_launch "SUCCESS" "Session closed normally (${DURATION}s)."
+    fi
+else
+    # Safe Mode Logic: Minimal command, clean environment, no custom args
+    log_launch "WARN" "Launching Emergency Session (No Customs)..."
+    echo "--- GAMESCOPE SAFE-MODE START ---" >> "$LOG_FILE"
+    exec gamescope -e -- steam -steamdeck -steamos3 -autoconfig >> "$LOG_FILE" 2>&1
+fi
