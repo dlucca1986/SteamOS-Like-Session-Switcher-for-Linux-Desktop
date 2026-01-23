@@ -1,71 +1,98 @@
 #!/bin/bash
 # =============================================================================
-# SteamMachine-DIY - SDDM Session & State Handler
+# SteamMachine-DIY - SDDM State Helper (set-sddm-session)
 # =============================================================================
-# Description: Privileged helper to update SDDM autologin and state.
+# Version: 2.3.0
+# Description: Privileged helper with ANSI styling and atomic operations.
 # Path: /usr/local/bin/set-sddm-session
+# License: MIT
 # =============================================================================
 
-set -e
+set -eou pipefail
+
+# --- ANSI Colors (High Intensity for Root) ---
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+MAGENTA='\033[1;35m'
+CYAN='\033[1;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
 # --- Configuration ---
-readonly SDDM_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
-readonly SDDM_STATE="/var/lib/sddm/state.conf"
-readonly MASTER_LOG="/tmp/steamos-diy.log"
+readonly SDDM_CONF_DIR="/etc/sddm.conf.d"
+readonly SDDM_CONF_FILE="${SDDM_CONF_DIR}/zz-steamos-autologin.conf"
+readonly LOG_FILE="/tmp/steamos-diy.log"
+readonly RESTART_DELAY="2s"
 
-# Input Handling
-# $1: Session name (e.g., plasma or steamos-switcher)
-# $2: Username (if empty, we are returning to Desktop/Login screen)
-SESSION_NAME=$(basename "${1:-plasma}" .desktop)
-USER_NAME="$2"
+# Input Arguments
+readonly SESSION_NAME=$(basename "${1:-steamos-switcher}" .desktop)
+readonly USER_NAME="${2:-}"
 
-# --- 1. Persistent Configuration Logic ---
+# --- Logging System ---
+log_helper() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local color=$NC
 
-if [[ -z "$USER_NAME" || "$SESSION_NAME" == "plasma" ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SDDM-Helper] Action: Returning to Desktop. Removing autologin." >> "$MASTER_LOG"
-    sudo rm -f "$SDDM_CONF"
-    TARGET_SESSION="plasma"
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SDDM-Helper] Action: Setting autologin for $USER_NAME." >> "$MASTER_LOG"
-    cat <<EOF | sudo tee "$SDDM_CONF" > /dev/null
+    case "$level" in
+        "INFO")    color=$CYAN ;;
+        "SUCCESS") color=$GREEN ;;
+        "ERROR")   color=$RED ;;
+    esac
+
+    local log_entry="[$timestamp] [HELPER-$level] $message"
+
+    # Terminal Output (Bold for emphasis)
+    echo -e "${MAGENTA}${BOLD}[HELPER]${NC} ${color}${message}${NC}"
+
+    # Clean File Output
+    echo "$log_entry" >> "$LOG_FILE" 2>/dev/null || true
+    logger -t SteamMachine-DIY "$log_entry"
+}
+
+# --- Validation ---
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${RED}${BOLD}CRITICAL ERROR:${NC} This script must be run as root (via sudo)"
+    exit 1
+fi
+
+if [[ -z "$USER_NAME" ]]; then
+    log_helper "ERROR" "Execution failed: No target username provided."
+    exit 1
+fi
+
+# --- Atomic Configuration Write ---
+log_helper "INFO" "Applying SDDM State -> User: $USER_NAME | Session: $SESSION_NAME"
+
+mkdir -p "$SDDM_CONF_DIR"
+
+# Creazione file temporaneo
+TMP_FILE=$(mktemp)
+cat <<EOF > "$TMP_FILE"
 [Autologin]
 User=$USER_NAME
 Session=$SESSION_NAME
 Relogin=false
 EOF
-    sudo chmod 644 "$SDDM_CONF"
-    TARGET_SESSION="$SESSION_NAME"
+
+# Spostamento atomico
+if mv "$TMP_FILE" "$SDDM_CONF_FILE"; then
+    chmod 644 "$SDDM_CONF_FILE"
+    log_helper "SUCCESS" "SDDM Configuration successfully updated."
+else
+    rm -f "$TMP_FILE"
+    log_helper "ERROR" "Failed to move configuration file."
+    exit 1
 fi
 
-# --- 2. SDDM State Persistence (Crucial for UI consistency) ---
-# We force SDDM to remember the target session even if autologin is disabled.
-echo "[SDDM-Helper] Updating SDDM state.conf to $TARGET_SESSION" >> "$MASTER_LOG"
-cat <<EOF | sudo tee "$SDDM_STATE" > /dev/null
-[Last]
-User=${USER_NAME:-}
-Session=$TARGET_SESSION
-EOF
+# --- Hardware Reset (Intel UHD 620 Fix) ---
+log_helper "INFO" "Intel GPU Reset: Scheduling SDDM restart in ${YELLOW}$RESTART_DELAY${NC}..."
 
-sync
+# Esecuzione asincrona via systemd-run
+systemd-run --description="SteamMachine-DIY SDDM Restart" \
+            --on-active="$RESTART_DELAY" \
+            /usr/bin/systemctl restart sddm
 
-# --- 3. Clean Service Restart ---
-# Detached restart to ensure the script completes before SDDM stops.
-
-
-systemd-run --unit=steamos-sddm-restart --description="SteamMachine-DIY: SDDM Restart" --scope bash -c "
-    echo 'Stopping SDDM...'
-    systemctl stop sddm
-    
-    # Force release of DRM/GPU resources (Critical for Intel UHD)
-    echo 'Cleaning up GPU resources...'
-    pkill -9 gamescope || true
-    pkill -9 Xwayland || true
-    pkill -9 Xorg || true
-    rm -rf /tmp/.X11-unix/X*
-    
-    sleep 1
-    echo 'Starting SDDM...'
-    systemctl start sddm
-" &
-
-exit 0
+echo -e "${MAGENTA}${BOLD}==================================================${NC}"
