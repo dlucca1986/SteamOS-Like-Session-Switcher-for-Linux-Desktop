@@ -88,29 +88,34 @@ clean_user_data() {
     local USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
     local TARGET_DIR="$USER_HOME/.config/steamos-diy"
 
-    # --- Desktop Shortcut Removal ---
-    # Detect Desktop directory via xdg-user-dir
+    # --- 1. Desktop Shortcut Removal ---
     local DESKTOP_DIR=$(sudo -u "$REAL_USER" xdg-user-dir DESKTOP 2>/dev/null || echo "$USER_HOME/Desktop")
     if [[ -f "$DESKTOP_DIR/GameMode.desktop" ]]; then
         rm -f "$DESKTOP_DIR/GameMode.desktop"
         success "Removed Desktop shortcut from $DESKTOP_DIR"
     fi
+
+    # --- 2. Pinned Taskbar Icon Check (KDE Plasma) ---
+    # Look for the plasma appletsrc config (can have slight name variations)
+    local PLASMA_CONFIG=$(find "$USER_HOME/.config" -name "plasma*appletsrc" | head -n 1)
     
-    # --- Check for pinned taskbar icons (KDE Plasma) ---
-    if [[ -f "$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" ]]; then
-        if grep -q "GameMode.desktop" "$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"; then
+    if [[ -f "$PLASMA_CONFIG" ]]; then
+        # Search for "GameMode" in the panel configuration file
+        if grep -qi "GameMode" "$PLASMA_CONFIG"; then
             echo -e "${YELLOW}"
-            warn "A pinned icon was detected on your Task Manager/Panel."
-            info "Please right-click and 'Unpin' it manually, as it is managed by Plasma's UI configuration."
+            echo -e "${BOLD}[NOTICE] Pinned icon detected!${NC}"
+            warn "A ghost icon (white sheet) might remain on your Taskbar/Panel."
+            info "Please right-click the empty icon and select 'Unpin' manually."
             echo -e "${NC}"
         fi
     fi
 
-    # --- Configuration and Logs Removal ---
+    # --- 3. Config and Logs Removal ---
     if [[ -d "$TARGET_DIR" ]]; then
         echo -e "${YELLOW}"
         read -p "[QUESTION] Do you want to remove user config files and logs in $TARGET_DIR? (y/N): " -n 1 -r
-        echo -e ""
+        echo -e "${NC}"
+        echo "" # New line for better formatting
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$TARGET_DIR"
             success "User configuration and logs deleted."
@@ -131,10 +136,6 @@ remove_files
 remove_links
 clean_user_data
 
-# Performance restoration (Optional)
+# Performance restoration
 if [[ -x /usr/bin/gamescope ]]; then
-    setcap -r /usr/bin/gamescope 2>/dev/null && info "Reset Gamescope capabilities."
-fi
-
-echo -e "\n${GREEN}${BOLD}Uninstallation Complete!${NC}"
-info "The system has been restored to its original state."
+    setcap -r /usr/bin/
