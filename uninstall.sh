@@ -95,6 +95,16 @@ clean_user_data() {
         rm -f "$DESKTOP_DIR/GameMode.desktop"
         success "Removed Desktop shortcut from $DESKTOP_DIR"
     fi
+    
+    # --- Check for pinned taskbar icons (KDE Plasma) ---
+    if [[ -f "$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" ]]; then
+        if grep -q "GameMode.desktop" "$USER_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"; then
+            echo -e "${YELLOW}"
+            warn "A pinned icon was detected on your Task Manager/Panel."
+            info "Please right-click and 'Unpin' it manually, as it is managed by Plasma's UI configuration."
+            echo -e "${NC}"
+        fi
+    fi
 
     # --- Configuration and Logs Removal ---
     if [[ -d "$TARGET_DIR" ]]; then
