@@ -2,7 +2,7 @@
 # =============================================================================
 # SteamMachine-DIY - Master Installer
 # Version: 3.0.0
-# Description: Professional deployment for SteamOS-like experience on Arch
+# Description: Deployment for SteamOS-like experience on Arch
 # Repository: https://github.com/dlucca1986/SteamMachine-DIY
 # License: MIT
 # =============================================================================
@@ -69,47 +69,49 @@ install_dependencies() {
 deploy_binaries() {
     info "Deploying binaries to $BIN_DEST..."
     mkdir -p "$HELPERS_DEST"
-    
-    cp "$SOURCE_DIR/bin/os-session-select" "$BIN_DEST/"
-    cp "$SOURCE_DIR/bin/set-sddm-session" "$BIN_DEST/"
-    cp "$SOURCE_DIR/bin/steamos-session-launch" "$BIN_DEST/"
-    cp "$SOURCE_DIR/bin/steamos-helpers/"* "$HELPERS_DEST/"
-    
+
+    cp "$SOURCE_DIR/usr/local/bin/os-session-select" "$BIN_DEST/"
+    cp "$SOURCE_DIR/usr/local/bin/set-sddm-session" "$BIN_DEST/"
+    cp "$SOURCE_DIR/usr/local/bin/steamos-session-launch" "$BIN_DEST/"
+    cp "$SOURCE_DIR/usr/local/bin/steamos-helpers/"* "$HELPERS_DEST/"
+
     chmod +x "$BIN_DEST/os-session-select" \
              "$BIN_DEST/set-sddm-session" \
              "$BIN_DEST/steamos-session-launch"
     chmod +x "$HELPERS_DEST/"*
-    
+
     success "Binaries deployed."
 }
 
 setup_integration() {
     info "Integrating with system (Desktop & SDDM)..."
+
     mkdir -p "$WAYLAND_SESSIONS"
-    cp "$SOURCE_DIR/desktop-entries/steamos-switcher.desktop" "$WAYLAND_SESSIONS/"
-    
+    cp "$SOURCE_DIR/usr/share/wayland-sessions/steamos-switcher.desktop" "$WAYLAND_SESSIONS/"
+
     mkdir -p "$APP_ENTRIES"
-    cp "$SOURCE_DIR/desktop-entries/GameMode.desktop" "$APP_ENTRIES/"
-    
+    cp "$SOURCE_DIR/usr/share/applications/GameMode.desktop" "$APP_ENTRIES/"
+
     mkdir -p "$SDDM_CONF_DIR"
-    cp "$SOURCE_DIR/sddm-config/10-wayland.conf" "$SDDM_CONF_DIR/"
-    
+    cp "$SOURCE_DIR/etc/sddm.conf.d/10-wayland.conf" "$SDDM_CONF_DIR/"
+
     success "Integration entries created."
 }
 
 create_symlinks() {
     info "Creating compatibility symlinks..."
     mkdir -p "$POLKIT_LINKS_DIR"
-    
-    ln -sf "$BIN_DEST/os-session-select" "$POLKIT_LINKS_DIR/steamos-session-select"
-    ln -sf "$POLKIT_LINKS_DIR/steamos-session-select" "/bin/steamos-session-select"
-    
+
+    # Direct link for the session switcher
+    ln -sf "$BIN_DEST/os-session-select" "/usr/bin/steamos-session-select"
+
+    # Direct links for system helpers
     for helper in "$HELPERS_DEST"/*; do
         name=$(basename "$helper")
         ln -sf "$helper" "$POLKIT_LINKS_DIR/$name"
     done
-    
-    success "Symlinks established."
+
+    success "Symlinks established (direct paths)."
 }
 
 setup_security() {
@@ -143,18 +145,32 @@ EOF
 }
 
 setup_user_config() {
-    info "Deploying User Configuration Template..."
+    info "Deploying User Configuration and Desktop Shortcut..."
     local REAL_USER=${SUDO_USER:-$USER}
     local USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
     local TARGET_DIR="$USER_HOME/.config/steamos-diy"
-    
+
+    # 1. Configuration Management
     mkdir -p "$TARGET_DIR"
     if [[ ! -f "$TARGET_DIR/config" ]]; then
-        cp "$SOURCE_DIR/config/steamos-diy.config.example" "$TARGET_DIR/config"
+        cp "$SOURCE_DIR/config/config.example" "$TARGET_DIR/config"
         chown -R "$REAL_USER":"$REAL_USER" "$TARGET_DIR"
-        success "Default config deployed."
+        success "Default config deployed to $TARGET_DIR/config"
     else
         warn "User config already exists. Skipping."
+    fi
+
+    # 2. Desktop Shortcut Management
+    local DESKTOP_DIR=$(sudo -u "$REAL_USER" xdg-user-dir DESKTOP 2>/dev/null || echo "$USER_HOME/Desktop")
+
+    if [[ -d "$DESKTOP_DIR" ]]; then
+        cp "$SOURCE_DIR/usr/share/applications/GameMode.desktop" "$DESKTOP_DIR/"
+        chown "$REAL_USER":"$REAL_USER" "$DESKTOP_DIR/GameMode.desktop"
+        chmod +x "$DESKTOP_DIR/GameMode.desktop"
+
+        # Mark as trusted for KDE Plasma
+        sudo -u "$REAL_USER" dbus-launch gio set "$DESKTOP_DIR/GameMode.desktop" metadata::trusted true 2>/dev/null || true
+        success "Desktop shortcut created in $DESKTOP_DIR."
     fi
 }
 
@@ -170,7 +186,7 @@ deploy_binaries
 setup_integration
 create_symlinks
 setup_security
-setup_pacman_hooks # <--- AGGIUNTO QUI
+setup_pacman_hooks
 setup_user_config
 
 # Performance optimization (Immediate effect)
