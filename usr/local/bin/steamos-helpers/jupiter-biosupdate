@@ -7,7 +7,8 @@
 #              Prevents errors during session transitions on DIY hardware.
 # Repository: https://github.com/dlucca1986/SteamMachine-DIY
 # Path:        /usr/local/bin/steamos-helpers/jupiter-biosupdate
-# License:MIT
+# License: MIT
+# Version: 3.0.0
 # =============================================================================
 
 # --- Configuration & Logging ---
