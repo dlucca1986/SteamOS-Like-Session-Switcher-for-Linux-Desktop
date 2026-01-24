@@ -1,10 +1,10 @@
 #!/bin/bash
 # =============================================================================
 # SteamMachine-DIY - Master Uninstaller
-# Version: 1.0.0
-# Description: Safely removes all SteamMachine-DIY components and symlinks
+# Version: 3.0.0
+# Description: Safely removes all SteamMachine-DIY components, hooks and symlinks
 # Repository: https://github.com/dlucca1986/SteamMachine-DIY
-# License:MIT
+# License: MIT
 # =============================================================================
 
 set -eou pipefail
@@ -24,9 +24,11 @@ BIN_FILES=("/usr/local/bin/os-session-select" "/usr/local/bin/set-sddm-session" 
 HELPERS_DIR="/usr/local/bin/steamos-helpers"
 POLKIT_DIR="/usr/bin/steamos-polkit-helpers"
 SDDM_CONF="/etc/sddm.conf.d/10-wayland.conf"
+SDDM_AUTOLOGIN="/etc/sddm.conf.d/zz-steamos-autologin.conf"
 SUDOERS_FILE="/etc/sudoers.d/steamos-switcher"
 SESSION_FILE="/usr/share/wayland-sessions/steamos-switcher.desktop"
 APP_FILE="/usr/share/applications/GameMode.desktop"
+PACMAN_HOOK="/etc/pacman.d/hooks/gamescope-capabilities.hook"
 
 # --- UI Functions ---
 info()    { echo -e "${CYAN}[SYSTEM]${NC} $1"; }
@@ -54,17 +56,19 @@ remove_files() {
 
     info "Cleaning system integration (SDDM & Sessions)..."
     [[ -f "$SDDM_CONF" ]] && rm -f "$SDDM_CONF" && success "Removed SDDM config"
+    [[ -f "$SDDM_AUTOLOGIN" ]] && rm -f "$SDDM_AUTOLOGIN" && success "Removed SDDM autologin override"
     [[ -f "$SESSION_FILE" ]] && rm -f "$SESSION_FILE" && success "Removed Wayland session"
     [[ -f "$APP_FILE" ]] && rm -f "$APP_FILE" && success "Removed Application menu entry"
     [[ -f "$SUDOERS_FILE" ]] && rm -f "$SUDOERS_FILE" && success "Removed Sudoers policy"
+    
+    info "Removing persistence hooks..."
+    [[ -f "$PACMAN_HOOK" ]] && rm -f "$PACMAN_HOOK" && success "Removed Pacman capability hook"
 }
 
 remove_links() {
     info "Removing compatibility symlinks..."
-    # Remove the double-link in /bin
     [[ -L "/bin/steamos-session-select" ]] && rm -f "/bin/steamos-session-select"
     
-    # Remove the polkit-helpers directory
     if [[ -d "$POLKIT_DIR" ]]; then
         rm -rf "$POLKIT_DIR" && success "Removed $POLKIT_DIR"
     fi
@@ -77,7 +81,7 @@ clean_user_data() {
 
     if [[ -d "$TARGET_DIR" ]]; then
         echo -e "${YELLOW}"
-        read -p "[QUESTION] Do you want to remove user config files in $TARGET_DIR? (y/N): " -n 1 -r
+        read -p "[QUESTION] Do you want to remove user config files and logs in $TARGET_DIR? (y/N): " -n 1 -r
         echo -e "${NC}"
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             rm -rf "$TARGET_DIR"
@@ -91,7 +95,7 @@ clean_user_data() {
 # --- Execution ---
 clear
 echo -e "${RED}${BOLD}==================================================${NC}"
-echo -e "${RED}${BOLD}          STEAM MACHINE DIY - UNINSTALLER         ${NC}"
+echo -e "${RED}${BOLD}           STEAM MACHINE DIY - UNINSTALLER        ${NC}"
 echo -e "${RED}${BOLD}==================================================${NC}"
 
 check_privileges
@@ -99,9 +103,5 @@ remove_files
 remove_links
 clean_user_data
 
-# Optional: Suggest removing packages? 
-# No, better not to touch packages (steam, gamescope) as they might be used elsewhere.
-
 echo -e "\n${GREEN}${BOLD}Uninstallation Complete!${NC}"
 info "The system has been restored to its original state."
-info "Note: Core packages (gamescope, steam, etc.) were NOT removed."
