@@ -102,16 +102,14 @@ create_symlinks() {
     info "Creating compatibility symlinks..."
     mkdir -p "$POLKIT_LINKS_DIR"
 
-    # Direct link for the session switcher
     ln -sf "$BIN_DEST/os-session-select" "/usr/bin/steamos-session-select"
 
-    # Direct links for system helpers
     for helper in "$HELPERS_DEST"/*; do
         name=$(basename "$helper")
         ln -sf "$helper" "$POLKIT_LINKS_DIR/$name"
     done
 
-    success "Symlinks established (direct paths)."
+    success "Symlinks established."
 }
 
 setup_security() {
@@ -139,4 +137,15 @@ Target = gamescope
 [Action]
 Description = Restoring Gamescope capabilities (cap_sys_admin, cap_sys_nice, cap_ipc_lock)...
 When = PostTransaction
-Exec = /usr/bin/setcap '
+Exec = /usr/bin/setcap 'cap_sys_admin,cap_sys_nice,cap_ipc_lock+ep' /usr/bin/gamescope
+EOF
+    success "Pacman hook established."
+}
+
+setup_user_config() {
+    info "Deploying User Configuration Template and Desktop Shortcut..."
+    local REAL_USER=${SUDO_USER:-$USER}
+    local USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+    local TARGET_DIR="$USER_HOME/.config/steamos-diy"
+
+    #
