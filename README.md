@@ -79,7 +79,7 @@ Follow these steps to transform your system. The installer will guide you throug
 
 1. **Clone the repository**:
    ```bash
-   git clone [https://github.com/dlucca1986/SteamMachine-DIY.git](https://github.com/dlucca1986/SteamMachine-DIY.git)
+   git clone https://github.com/dlucca1986/SteamMachine-DIY.git
    ```
 
 2. **Enter the folder**:
