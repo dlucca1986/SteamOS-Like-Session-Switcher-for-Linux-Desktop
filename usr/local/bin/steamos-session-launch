@@ -3,7 +3,7 @@
 # SteamMachine-DIY - Intelligent Universal Launcher
 # =============================================================================
 # Version: 3.0.0
-# Description: Fail-safe launcher with Atomic Watchdog.
+# Description: Fail-safe launcher with Atomic Watchdog and hardware diagnostics.
 # Repository: https://github.com/dlucca1986/SteamMachine-DIY
 # Path: /usr/local/bin/steamos-session-launch
 # License: MIT
@@ -11,131 +11,82 @@
 
 set -eou pipefail
 
-# --- Configuration & Paths ---
-readonly LOG_FILE="/tmp/steamos-diy.log"
+# 1. Path Configuration
+readonly LOG_FILE="/var/log/steamos-diy.log"
 readonly CONFIG_DIR="$HOME/.config/steamos-diy"
 readonly CONFIG_FILE="$CONFIG_DIR/config"
 
-# --- UI Styling ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+# Logging Function: Writes and ensures open permissions for the Control Center
+log_msg() {
+    local level="$1"
+    local msg="$2"
+    # Write to log. Silence errors if the file is temporarily locked or inaccessible.
+    echo "[$level] $(date '+%Y-%m-%d %H:%M:%S') - $msg" >> "$LOG_FILE" 2>/dev/null || true
+    chmod 666 "$LOG_FILE" 2>/dev/null || true
+}
 
-# --- 0. Mode Detection & Log Initialization ---
+# --- Hardware Diagnostics ---
+trace_gpu_failure() {
+    log_msg "DEBUG" "--- GPU FAILURE DIAGNOSTIC ---"
+    log_msg "DEBUG" "DRM Master Status: $(ls /sys/class/drm/card*/device/drm/card*/master 2>/dev/null || echo 'None found')"
+    log_msg "DEBUG" "Processes using GPU: $(fuser -v /dev/dri/card* 2>&1 || echo 'None')"
+}
+
+# 2. Safe Mode Management
 SAFE_MODE=false
 [[ "${1:-}" == "--safe-mode" ]] && SAFE_MODE=true
 
-if [ "$SAFE_MODE" = false ]; then
-    echo -e "${CYAN}[$(date '+%Y-%m-%d %H:%M:%S')] [SYSTEM] Starting new session. Logging initialized.${NC}" > "$LOG_FILE"
+if [ "$SAFE_MODE" = true ]; then
+    log_msg "ERROR" "SAFE MODE ACTIVE - Attempting recovery with autoconfig"
+    trace_gpu_failure
 else
-    {
-        echo -e "${YELLOW}------------------------------------------------------------${NC}"
-        echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] [RECOVERY] SAFE MODE ACTIVE: Environment Cleaned.${NC}"
-        echo -e "${YELLOW}------------------------------------------------------------${NC}"
-    } >> "$LOG_FILE"
+    log_msg "INFO" "Starting standard Gaming Session"
 fi
 
-log_launch() {
-    local LEVEL="$1"
-    local MESSAGE="$2"
-    local COLOR="$NC"
+# 3. Configuration Generation/Loading
+# If config is missing, attempt to auto-detect from connected monitors
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    mkdir -p "$CONFIG_DIR"
+    ACTIVE_PATH=$(grep -l "^connected" /sys/class/drm/card*-*/status | head -n1 || true)
 
-    case "$LEVEL" in
-        "INFO")     COLOR="$CYAN" ;;
-        "SUCCESS")  COLOR="$GREEN" ;;
-        "WARN")     COLOR="$YELLOW" ;;
-        "ERROR")    COLOR="$RED" ;;
-        "RECOVERY") COLOR="$YELLOW" ;;
-    esac
-
-    local _msg="[$(date '+%Y-%m-%d %H:%M:%S')] [${LEVEL}] ${MESSAGE}"
-    echo -e "${COLOR}${_msg}${NC}"
-    echo "$_msg" >> "$LOG_FILE" 2>/dev/null || true
-    logger -t SteamMachine-DIY "$_msg"
-}
-
-# --- 1. Hardware Auto-Detection ---
-if [ "$SAFE_MODE" = false ]; then
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        log_launch "INFO" "Configuration missing. Detecting hardware..."
-        mkdir -p "$CONFIG_DIR"
-
-        # Find first connected display via DRM sysfs
-        ACTIVE_PATH=$(grep -l "^connected" /sys/class/drm/card*-*/status | head -n1 || true)
-
-        if [[ -n "$ACTIVE_PATH" ]]; then
-            ACTIVE_DIR=$(dirname "$ACTIVE_PATH")
-            _CONN_NAME=$(basename "$ACTIVE_DIR")
-            _RES=$(head -n1 "$ACTIVE_DIR/modes" 2>/dev/null || echo "1280x720")
-            _W=$(echo "$_RES" | cut -d'x' -f1)
-            _H=$(echo "$_RES" | cut -d'x' -f2)
-            log_launch "SUCCESS" "Detected Display: ${_CONN_NAME} (${_W}x${_H})"
-        else
-            log_launch "WARN" "No display detected. Using 720p defaults."
-            _W=1280; _H=720
-        fi
-
-        cat <<EOF > "$CONFIG_FILE"
-# STEAM MACHINE DIY - RUNTIME CONFIGURATION
-TARGET_WIDTH=${_W:-1280}
-TARGET_HEIGHT=${_H:-720}
-REFRESH_RATE=60
-ENABLE_MANGOAPP=0
-ENABLE_HDR=0
-CUSTOM_ARGS=""
-EOF
-    fi
-
-    # --- 2. Load Config & Build Arguments ---
-    # shellcheck source=/dev/null
-    source "$CONFIG_FILE"
-
-    G_ARGS=("-e")
-    [[ -n "${TARGET_WIDTH:-}" ]]  && G_ARGS+=("-W" "$TARGET_WIDTH")
-    [[ -n "${TARGET_HEIGHT:-}" ]] && G_ARGS+=("-H" "$TARGET_HEIGHT")
-    [[ -n "${REFRESH_RATE:-}" ]]  && G_ARGS+=("-r" "$REFRESH_RATE")
-    [[ "${ENABLE_MANGOAPP:-0}" == "1" ]] && export STEAM_USE_MANGOAPP=1
-    [[ "${ENABLE_HDR:-0}" == "1" ]]      && G_ARGS+=("--hdr-enabled")
-
-    # If CUSTOM_ARGS contains errors, Gamescope will crash and trigger the Watchdog.
-    if [[ -n "${CUSTOM_ARGS:-}" ]]; then
-        read -r -a EXTRA_ARGS <<< "$CUSTOM_ARGS"
-        G_ARGS+=("${EXTRA_ARGS[@]}")
+    if [[ -n "$ACTIVE_PATH" ]]; then
+        ACTIVE_DIR=$(dirname "$ACTIVE_PATH")
+        _RES=$(head -n1 "$ACTIVE_DIR/modes" 2>/dev/null || echo "1280x720")
+        _W=$(echo "$_RES" | cut -d'x' -f1)
+        _H=$(echo "$_RES" | cut -d'x' -f2)
     else
-        # Standard performance fallback
-        G_ARGS+=("--rt")
+        _W=1280; _H=720
     fi
-else
-    log_launch "WARN" "Skipping user config for stability (Safe Mode)."
+    # Create default user config
+    echo -e "TARGET_WIDTH=$_W\nTARGET_HEIGHT=$_H\nREFRESH_RATE=60" > "$CONFIG_FILE"
+    log_msg "CONFIG" "No config found. Auto-detected: ${_W}x${_H}"
 fi
 
-# --- 3. Execution & Watchdog ---
-if [ "$SAFE_MODE" = false ]; then
-    log_launch "INFO" "Launching Gamescope: ${G_ARGS[*]}"
-    echo "--- GAMESCOPE PRIMARY START ---" >> "$LOG_FILE"
+# Load variables with safety fallbacks
+source "$CONFIG_FILE" 2>/dev/null || true
+W=${TARGET_WIDTH:-1280}
+H=${TARGET_HEIGHT:-720}
+R=${REFRESH_RATE:-60}
 
-    START_TIME=$(date +%s)
+G_ARGS=("-e" "-W" "$W" "-H" "$H" "-r" "$R")
 
-    # Watchdog Fix: '|| true' prevents 'set -e' from terminating the script on crash.
-    gamescope "${G_ARGS[@]}" -- steam -steamdeck -steamos3 >> "$LOG_FILE" 2>&1 || true
+# 4. Execution and Watchdog
+log_msg "LAUNCH" "Gamescope arguments: ${G_ARGS[*]}"
+START=$(date +%s)
 
-    DURATION=$(( $(date +%s) - START_TIME ))
+# Launch Steam under Gamescope
+# Using stdbuf to prevent logging delays for the Python GUI
+stdbuf -oL -eL gamescope "${G_ARGS[@]}" -- steam -steamdeck -steamos3 $([ "$SAFE_MODE" = true ] && echo "-autoconfig") >> "$LOG_FILE" 2>&1 || true
 
-    # Watchdog Logic: If session lasts < 3 seconds, trigger Safe Mode recovery.
-    if [ "$DURATION" -lt 3 ]; then
-        log_launch "ERROR" "Session failed after only ${DURATION}s."
-        log_launch "RECOVERY" "Triggering emergency relaunch in --safe-mode..."
-        sleep 2
-        exec "$0" --safe-mode
-    else
-        log_launch "SUCCESS" "Session terminated normally after ${DURATION}s."
-    fi
-else
-    log_launch "RECOVERY" "Launching Emergency Session (Minimal Defaults)..."
-    echo "--- GAMESCOPE SAFE-MODE START ---" >> "$LOG_FILE"
-    # Use 'exec' to replace current process and free system resources.
-    exec gamescope -e -- steam -steamdeck -steamos3 -autoconfig >> "$LOG_FILE" 2>&1
+# Ensure the log remains accessible after crash/closure
+chmod 666 "$LOG_FILE" 2>/dev/null || true
+
+# Watchdog: if the session lasts less than 2 seconds, it is considered a critical crash
+if [ "$SAFE_MODE" = false ] && [ $(( $(date +%s) - START )) -lt 2 ]; then
+    log_msg "CRITICAL" "Session lasted < 2s. Relaunching in Safe Mode..."
+    trace_gpu_failure
+    exec "$0" --safe-mode
 fi
+
+log_msg "SUCCESS" "Session terminated gracefully"
+exit 0
