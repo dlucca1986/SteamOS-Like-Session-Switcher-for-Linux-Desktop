@@ -2,8 +2,8 @@
 # =============================================================================
 # SteamMachine-DIY - Intelligent Universal Launcher
 # =============================================================================
-# Version: 3.0.0
-# Description: Fail-safe launcher with Atomic Watchdog and hardware diagnostics.
+# Version: 3.1.0
+# Description: Fail-safe launcher with HDR, VRR, and Mangoapp support.
 # Repository: https://github.com/dlucca1986/SteamMachine-DIY
 # Path: /usr/local/bin/steamos-session-launch
 # License: MIT
@@ -20,7 +20,6 @@ readonly CONFIG_FILE="$CONFIG_DIR/config"
 log_msg() {
     local level="$1"
     local msg="$2"
-    # Write to log. Silence errors if the file is temporarily locked or inaccessible.
     echo "[$level] $(date '+%Y-%m-%d %H:%M:%S') - $msg" >> "$LOG_FILE" 2>/dev/null || true
     chmod 666 "$LOG_FILE" 2>/dev/null || true
 }
@@ -44,7 +43,6 @@ else
 fi
 
 # 3. Configuration Generation/Loading
-# If config is missing, attempt to auto-detect from connected monitors
 if [[ ! -f "$CONFIG_FILE" ]]; then
     mkdir -p "$CONFIG_DIR"
     ACTIVE_PATH=$(grep -l "^connected" /sys/class/drm/card*-*/status | head -n1 || true)
@@ -57,8 +55,8 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     else
         _W=1280; _H=720
     fi
-    # Create default user config
-    echo -e "TARGET_WIDTH=$_W\nTARGET_HEIGHT=$_H\nREFRESH_RATE=60" > "$CONFIG_FILE"
+    # Create default user config with extra toggles (0=off, 1=on)
+    echo -e "TARGET_WIDTH=$_W\nTARGET_HEIGHT=$_H\nREFRESH_RATE=60\nENABLE_HDR=0\nENABLE_VRR=0\nENABLE_MANGOAPP=0" > "$CONFIG_FILE"
     log_msg "CONFIG" "No config found. Auto-detected: ${_W}x${_H}"
 fi
 
@@ -68,14 +66,19 @@ W=${TARGET_WIDTH:-1280}
 H=${TARGET_HEIGHT:-720}
 R=${REFRESH_RATE:-60}
 
+# Base Arguments
 G_ARGS=("-e" "-W" "$W" "-H" "$H" "-r" "$R")
+
+# --- Feature Toggles Logic ---
+[[ "${ENABLE_HDR:-0}" == "1" ]] && G_ARGS+=("--hdr-enabled") && log_msg "CONFIG" "HDR enabled"
+[[ "${ENABLE_VRR:-0}" == "1" ]] && G_ARGS+=("--adaptive-sync") && log_msg "CONFIG" "VRR enabled"
+[[ "${ENABLE_MANGOAPP:-0}" == "1" ]] && G_ARGS+=("--mangoapp") && log_msg "CONFIG" "Mangoapp enabled"
 
 # 4. Execution and Watchdog
 log_msg "LAUNCH" "Gamescope arguments: ${G_ARGS[*]}"
 START=$(date +%s)
 
 # Launch Steam under Gamescope
-# Using stdbuf to prevent logging delays for the Python GUI
 stdbuf -oL -eL gamescope "${G_ARGS[@]}" -- steam -steamdeck -steamos3 $([ "$SAFE_MODE" = true ] && echo "-autoconfig") >> "$LOG_FILE" 2>&1 || true
 
 # Ensure the log remains accessible after crash/closure
