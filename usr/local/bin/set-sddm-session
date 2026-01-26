@@ -1,72 +1,81 @@
 #!/bin/bash
 # =============================================================================
-# SteamMachine-DIY - SDDM State Helper (set-sddm-session)
+# SteamMachine-DIY - Privileged Helper (set-sddm-session)
 # =============================================================================
 # Version: 3.0.0
-# Description: Privileged helper with ANSI styling and atomic operations.
+# Description: Handles system-level session switching and hardware cleanup
 # Repository: https://github.com/dlucca1986/SteamMachine-DIY
 # Path: /usr/local/bin/set-sddm-session
 # License: MIT
 # =============================================================================
 
-set -eou pipefail
+set -euo pipefail
 
-# --- Configuration ---
-readonly LOG_FILE="/tmp/steamos-diy.log"
-readonly SDDM_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
-
-# Inputs
+# 1. Argument Retrieval (Consistent with os-session-select)
 readonly SESSION_NAME=$(basename "${1:-steamos-switcher}" .desktop)
-readonly USER_NAME="${2:-}"
+readonly TARGET_USER="${2:-}"
+readonly LOG_FILE="${3:-/var/log/steamos-diy.log}"
+readonly SDDM_CONF_DIR="/etc/sddm.conf.d"
+readonly AUTOLOGIN_FILE="$SDDM_CONF_DIR/zz-steamos-autologin.conf"
 
-# --- UI Styling (Aligned with os-session-select) ---
-BOLD='\033[1m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-RED='\033[0;31m'
-NC='\033[0m'
-
-# --- Functions ---
-log_info() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${CYAN}${BOLD}[INFO]${NC} $1"
-    echo "[$timestamp] [HELPER] $1" >> "$LOG_FILE" 2>/dev/null || true
+# Logging Function: Writes and unlocks permissions for the Control Center
+log_msg() {
+    local level="$1"
+    local msg="$2"
+    echo "[$level] $(date '+%Y-%m-%d %H:%M:%S') - $msg" >> "$LOG_FILE" 2>/dev/null || true
+    chmod 666 "$LOG_FILE" 2>/dev/null || true
 }
 
-log_error() {
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${RED}${BOLD}[ERROR]${NC} $1" >&2
-    echo "[$timestamp] [HELPER_ERROR] $1" >> "$LOG_FILE" 2>/dev/null || true
-}
-
-# --- Validation ---
+# Verify root privileges
 if [[ $EUID -ne 0 ]]; then
-    log_error "This helper must be run as root (via sudo)."
-    exit 1
+   log_msg "ERROR" "Execution requires root privileges"
+   exit 1
 fi
 
-# --- Logic ---
-if [[ -n "$USER_NAME" ]]; then
-    log_info "Updating SDDM autologin: User=${GREEN}$USER_NAME${NC}, Session=${GREEN}$SESSION_NAME${NC}"
-    
-    # Atomic configuration write
-    mkdir -p "$(dirname "$SDDM_CONF")"
-    cat <<EOF > "$SDDM_CONF"
-[Autologin]
-User=$USER_NAME
-Session=$SESSION_NAME
-Relogin=false
-EOF
-    chmod 644 "$SDDM_CONF"
-else
-    log_info "${RED}No username provided.${NC} Clearing autologin configuration..."
-    rm -f "$SDDM_CONF"
+# 2. Update SDDM Configuration
+if [[ -n "$TARGET_USER" ]]; then
+    mkdir -p "$SDDM_CONF_DIR"
+    # Clean write of the autologin file
+    printf "[Autologin]\nUser=%s\nSession=%s\nRelogin=false\n" "$TARGET_USER" "$SESSION_NAME" > "$AUTOLOGIN_FILE"
+    sync
+    log_msg "CONFIG" "SDDM autologin set to $SESSION_NAME for $TARGET_USER"
 fi
 
-# --- Execution ---
-log_info "Scheduling SDDM restart in 1 second..."
+# 3. Detach execution with Systemd-Run
+# We use systemd-run to prevent the session termination from killing this script
+systemd-run --unit=session-switcher-task --scope bash -c "
+    # Internal logging function for the systemd scope
+    log_sh() {
+        echo \"[\$1] \$(date '+%Y-%m-%d %H:%M:%S') - \$2\" >> '$LOG_FILE'
+        chmod 666 '$LOG_FILE' 2>/dev/null || true
+    }
 
-# Detach the restart from the current process to prevent graphical deadlocks.
-systemd-run --description="SteamMachine-DIY SDDM Restart" \
-            --on-active=1 \
-            /usr/bin/systemctl restart sddm
+    log_sh 'INFO' 'Stopping SDDM and cleaning up hardware hooks...'
+    systemctl stop sddm
+
+    # KMS Cleanup: Release the GPU
+    if fuser /dev/dri/card* >/dev/null 2>&1; then
+        fuser -k -9 /dev/dri/card* >/dev/null 2>&1 || true
+    fi
+
+    # Terminate orphan interface processes
+    pkill -9 -u '$TARGET_USER' kwin_wayland || true
+    pkill -9 -u '$TARGET_USER' Xwayland || true
+    pkill -9 -u '$TARGET_USER' gamescope || true
+    pkill -9 -u '$TARGET_USER' steam || true
+
+    sleep 0.5
+
+    # Rebind Virtual Terminal (VT) - Essential to avoid black screens
+    for vtc in /sys/class/vtconsole/vtcon*/bind; do
+        if [ -f \"\$vtc\" ]; then
+            echo 1 > \"\$vtc\" 2>/dev/null || true
+        fi
+    done
+
+    log_sh 'INFO' 'Restarting SDDM...'
+    systemctl start sddm
+    log_sh 'SUCCESS' 'Session switch finished'
+" &
+
+exit 0
