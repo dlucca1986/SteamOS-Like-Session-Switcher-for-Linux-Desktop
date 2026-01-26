@@ -1,14 +1,14 @@
 # SteamMachine-DIY User Configuration
-# This file is sourced by steamos-session-launch
+# Leaving values empty will enable Auto-Negotiation (Recommended)
 
 # Visual Dimensions
-TARGET_WIDTH=1280
-TARGET_HEIGHT=720
+TARGET_WIDTH=
+TARGET_HEIGHT=
 
 # Display Refresh Rate
-REFRESH_RATE=60
+REFRESH_RATE=
 
-# Feature Toggles (1 = Enabled, 0 = Disabled)
+# Feature Toggles
 ENABLE_HDR=0
 ENABLE_VRR=0
 ENABLE_MANGOAPP=0
