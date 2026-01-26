@@ -1,0 +1,6 @@
+# SteamMachine-DIY User Configuration
+# These values are used by steamos-session-launch
+
+TARGET_WIDTH=1280
+TARGET_HEIGHT=720
+REFRESH_RATE=60
