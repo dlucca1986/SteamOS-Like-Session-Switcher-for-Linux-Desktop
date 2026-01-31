@@ -9,94 +9,114 @@
 # License: MIT
 # =============================================================================
 
-set -eou pipefail
+et -eou pipefail
 
-# --- 1. Path Configuration ---
+# --- 1. CONFIGURATION & LOGGING ---
 readonly LOG_FILE="/var/log/steamos-diy.log"
-readonly CONFIG_FILE="$HOME/.config/steamos-diy/config"
+readonly CONFIG_DIR="$HOME/.config/steamos-diy"
+readonly CONFIG_FILE="$CONFIG_DIR/config"
 
-# Logging Function: Writes to file and ensures open permissions for the UI/Control Center
-log_msg() {
-    local level="$1"
+log() {
+    local tag="$1"
     local msg="$2"
-    echo "[$level] $(date '+%Y-%m-%d %H:%M:%S') - $msg" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$tag] $msg" >> "$LOG_FILE" 2>/dev/null || true
     chmod 666 "$LOG_FILE" 2>/dev/null || true
 }
 
-# Hardware Diagnostics: Logged on crash to help troubleshoot DRM/GPU issues
-trace_gpu_failure() {
-    log_msg "DEBUG" "--- GPU FAILURE DIAGNOSTIC ---"
-    log_msg "DEBUG" "DRM Master Status: $(ls /sys/class/drm/card*/device/drm/card*/master 2>/dev/null || echo 'None found')"
-    log_msg "DEBUG" "Processes using GPU: $(fuser -v /dev/dri/card* 2>&1 || echo 'None')"
-}
+echo "========================================" >> "$LOG_FILE"
+log "INIT" "New SteamOS-DIY session initiated"
 
-# --- 2. Modes & Flags Initialization ---
-SAFE_MODE=false
-[[ "${1:-}" == "--safe-mode" ]] && SAFE_MODE=true
+# --- 2. HARDWARE DETECTION ---
+# Attempt to find the primary connected display and its native resolution
+DRM_CONN=$(grep -l "^connected" /sys/class/drm/card*-*/status | head -n1 || true)
+DRM_PATH=$(dirname "$DRM_CONN")
+NATIVE_RES=$(head -n1 "$DRM_PATH/modes" 2>/dev/null || echo "1280x720")
+HW_W=${NATIVE_RES%x*}
+HW_H=${NATIVE_RES#*x}
+log "CONFIG" "Native hardware detected: ${HW_W}x${HW_H}"
 
-# Reset variables to empty (Empty values = Gamescope Auto-Negotiation)
-W=""; H=""; R=""; HDR=0; VRR=0; MANGO=0
+# --- 3. DEFAULTS & CONFIG LOADING ---
+TARGET_WIDTH=""
+TARGET_HEIGHT=""
+REFRESH_RATE=""
+ENABLE_HDR=0
+ENABLE_VRR=0
+ENABLE_MANGOAPP=0
+GAMESCOPE_ARGS=""
 
-# --- 3. Configuration Logic ---
-if [ "$SAFE_MODE" = true ]; then
-    log_msg "ERROR" "!! SAFE MODE ACTIVE !! - Bypassing config and using -autoconfig"
-    trace_gpu_failure
+# Source user configuration if it exists
+[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+
+# --- 4. DYNAMIC ARGUMENTS CONSTRUCTION ---
+# Initialize options array with Steam integration flag (-e)
+G_OPTS=("-e")
+
+# Resolution and Refresh Rate Handling
+FINAL_W=${TARGET_WIDTH:-$HW_W}
+FINAL_H=${TARGET_HEIGHT:-$HW_H}
+FINAL_R=${REFRESH_RATE:-60}
+
+# Safety Cap: Ensure requested resolution doesn't exceed physical hardware limits
+if [ "$FINAL_W" -gt "$HW_W" ] || [ "$FINAL_H" -gt "$HW_H" ]; then
+    log "WARN" "Requested ${FINAL_W}x${FINAL_H} exceeds hardware. Capping to native."
+    FINAL_W=$HW_W; FINAL_H=$HW_H; FINAL_R=60
+fi
+
+G_OPTS+=("-W" "$FINAL_W" "-H" "$FINAL_H" "-r" "$FINAL_R")
+
+# Feature Toggles
+[[ "$ENABLE_HDR" == "1" ]] && G_OPTS+=("--hdr-enabled")
+[[ "$ENABLE_VRR" == "1" ]] && G_OPTS+=("--adaptive-sync")
+[[ "$ENABLE_MANGOAPP" == "1" ]] && G_OPTS+=("--mangoapp")
+
+# Append extra Gamescope arguments from config (e.g., --backend sdl)
+if [[ -n "$GAMESCOPE_ARGS" ]]; then
+    read -r -a EXTRA <<< "$GAMESCOPE_ARGS"
+    G_OPTS+=("${EXTRA[@]}")
+fi
+
+log "LAUNCH" "Gamescope OPTS: ${G_OPTS[*]}"
+
+# --- 5. EXECUTION & WATCHDOG ---
+START_TIME=$(date +%s)
+G_EXIT_CODE=0
+
+# Launch Gamescope with line-buffered output to capture logs in real-time
+stdbuf -oL -eL gamescope "${G_OPTS[@]}" -- \
+    steam -steamdeck -steamos3 >> "$LOG_FILE" 2>&1 || G_EXIT_CODE=$?
+
+RUNTIME=$(( $(date +%s) - START_TIME ))
+
+# Watchdog logic: If it crashes within 10 seconds, retry in Native Safe Mode
+if [ "$G_EXIT_CODE" -ne 0 ] && [ "$RUNTIME" -lt 10 ]; then
+    log "CRITICAL" "Early crash detected after ${RUNTIME}s. Recovering to Safe Mode..."
+    # Safe Mode: Native resolution, no experimental flags, standard 60Hz
+    stdbuf -oL -eL gamescope -e -W "$HW_W" -H "$HW_H" -r 60 -- \
+        steam -steamdeck -steamos3 >> "$LOG_FILE" 2>&1
 else
-    if [[ -f "$CONFIG_FILE" ]]; then
-        # Standard load from the configuration file provided by the installer/UI
-        source "$CONFIG_FILE" 2>/dev/null || true
-        W=${TARGET_WIDTH:-}
-        H=${TARGET_HEIGHT:-}
-        R=${REFRESH_RATE:-}
-        HDR=${ENABLE_HDR:-0}
-        VRR=${ENABLE_VRR:-0}
-        MANGO=${ENABLE_MANGOAPP:-0}
-        log_msg "INFO" "Configuration loaded from $CONFIG_FILE"
+    log "EXIT" "Session finished. Exit code: $G_EXIT_CODE"
+fi
+
+# --- 6. STEAM ERROR EXTRACTOR ---
+# If a crash occurred, attempt to extract relevant lines from Steam's own log
+if [ "$G_EXIT_CODE" -ne 0 ]; then
+    log "DIAGNOSTIC" "Session exited with error code $G_EXIT_CODE. Checking Steam logs..."
+
+    STEAM_LOG_PATH="$HOME/.local/share/Steam/logs/console-linux.txt"
+
+    if [[ -f "$STEAM_LOG_PATH" ]]; then
+        # Search for the last sync marker written by the 'sdy' wrapper
+        LAST_START_MARKER=$(grep -a "SDY_REATTIVO_START" "$STEAM_LOG_PATH" | tail -n 1 || true)
+
+        if [[ -n "$LAST_START_MARKER" ]]; then
+            log "STEAM_ERR" ">>> Extracting relevant lines from Steam Console <<<"
+            # Extract the 30 lines following the last marker for diagnostic context
+            grep -a -F -A 30 "$LAST_START_MARKER" "$STEAM_LOG_PATH" >> "$LOG_FILE" || true
+            log "STEAM_ERR" ">>> End of Steam extraction <<<"
+        else
+            log "WARN" "No SDY marker found. Steam log might not have been flushed yet."
+        fi
     else
-        log_msg "WARN" "Config file not found. Proceeding with AUTO settings."
+        log "WARN" "Steam console log not found at $STEAM_LOG_PATH"
     fi
 fi
-
-# --- 4. Building Arguments ---
-# -e: Required for Steam integration
-G_ARGS=("-e")
-
-# Apply user-defined parameters only if not in Safe Mode
-if [ "$SAFE_MODE" = false ]; then
-    [[ -n "$W" && -n "$H" ]] && G_ARGS+=("-W" "$W" "-H" "$H")
-    [[ -n "$R" ]] && G_ARGS+=("-r" "$R")
-    [[ "$HDR" == "1" ]] && G_ARGS+=("--hdr-enabled")
-    [[ "$VRR" == "1" ]] && G_ARGS+=("--adaptive-sync")
-    [[ "$MANGO" == "1" ]] && G_ARGS+=("--mangoapp")
-fi
-
-# --- 5. Session Start ---
-log_msg "INFO" "-----------------------------------------------"
-log_msg "INFO" " SESSION: $([ "$SAFE_MODE" = true ] && echo "!! SAFE MODE !!" || echo "USER OPTIMIZED")"
-log_msg "INFO" " RENDER: ${W:-AUTO}x${H:-AUTO} @ ${R:-AUTO}Hz"
-log_msg "INFO" " FLAGS: HDR:$HDR VRR:$VRR MANGO:$MANGO"
-log_msg "INFO" "-----------------------------------------------"
-
-START=$(date +%s)
-
-# Execute Steam inside Gamescope
-# -steamdeck -steamos3: Forces the Handheld UI
-# -autoconfig: Only added during Safe Mode to reset corrupted internal video settings
-stdbuf -oL -eL gamescope "${G_ARGS[@]}" -- \
-    steam -steamdeck -steamos3 \
-    $([ "$SAFE_MODE" = true ] && echo "-autoconfig") >> "$LOG_FILE" 2>&1 || true
-
-# --- 6. Watchdog & Recovery ---
-# Ensure the log file permissions remain accessible after session end/crash
-chmod 666 "$LOG_FILE" 2>/dev/null || true
-
-# Watchdog: If the session crashes in less than 2 seconds, trigger Safe Mode recovery
-if [ "$SAFE_MODE" = false ] && [ $(( $(date +%s) - START )) -lt 2 ]; then
-    log_msg "CRITICAL" "Session lasted < 2s. Crash detected."
-    trace_gpu_failure
-    log_msg "RECOVERY" "Re-executing in Safe Mode: exec $0 --safe-mode"
-    exec "$0" --safe-mode
-fi
-
-log_msg "SUCCESS" "Session terminated gracefully"
-exit 0
